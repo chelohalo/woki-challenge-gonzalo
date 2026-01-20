@@ -1,6 +1,6 @@
 import { getRestaurantById } from '../repositories/restaurant.repository.js';
 import { getTablesBySector } from '../repositories/table.repository.js';
-import { getOverlappingReservations } from '../repositories/reservation.repository.js';
+import { getReservationsByDay } from '../repositories/reservation.repository.js';
 import { generate15MinSlots, isWithinShift, addMinutesToDate, formatISODateTime } from '../utils/datetime.js';
 import { Errors } from '../utils/errors.js';
 
@@ -36,10 +36,17 @@ export async function getAvailability(
     (t) => t.minSize <= partySize && partySize <= t.maxSize
   );
 
-  // 4. Generate 15-minute slots for the day
+  // 4. Get ALL reservations for the day ONCE (optimization: single query)
+  const allReservations = await getReservationsByDay(
+    restaurantId,
+    date,
+    sectorId
+  );
+
+  // 5. Generate 15-minute slots for the day
   const slots = generate15MinSlots(date, restaurant.timezone, restaurant.shifts || undefined);
 
-  // 5. For each slot, check availability
+  // 6. Process slots in memory (no additional DB queries)
   const availability: AvailabilitySlot[] = [];
 
   for (const slotStart of slots) {
@@ -52,17 +59,18 @@ export async function getAvailability(
       continue; // Skip slots outside shifts
     }
 
-    // Check for available tables
+    // Check for available tables (in memory - no DB queries)
     const availableTableIds: string[] = [];
 
     for (const table of eligibleTables) {
-      const overlapping = await getOverlappingReservations(
-        [table.id],
-        slotStartISO,
-        slotEndISO
-      );
+      // Check overlaps in memory
+      const hasOverlap = allReservations.some((r) => {
+        // Overlap: (r.start < slotEnd) AND (r.end > slotStart)
+        const overlaps = r.startDateTime < slotEndISO && r.endDateTime > slotStartISO;
+        return overlaps && r.tableIds.includes(table.id);
+      });
 
-      if (overlapping.length === 0) {
+      if (!hasOverlap) {
         availableTableIds.push(table.id);
       }
     }
