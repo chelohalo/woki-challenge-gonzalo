@@ -1,5 +1,5 @@
 import { format, parse, addMinutes, startOfDay, eachMinuteOfInterval } from 'date-fns';
-import { formatInTimeZone, zonedTimeToUtc, utcToZonedTime } from 'date-fns-tz';
+import { toZonedTime, fromZonedTime, formatInTimeZone } from 'date-fns-tz';
 
 export function parseISODateTime(iso: string): Date {
   return new Date(iso);
@@ -23,9 +23,9 @@ export function addMinutesToDate(date: Date, minutes: number): Date {
 }
 
 export function getStartOfDay(date: Date, timezone: string): Date {
-  const zonedDate = utcToZonedTime(date, timezone);
+  const zonedDate = toZonedTime(date, timezone);
   const start = startOfDay(zonedDate);
-  return zonedTimeToUtc(start, timezone);
+  return fromZonedTime(start, timezone);
 }
 
 export function generate15MinSlots(
@@ -36,7 +36,7 @@ export function generate15MinSlots(
   const slots: Date[] = [];
   
   // Get the date in the restaurant's timezone
-  const zonedDate = utcToZonedTime(date, timezone);
+  const zonedDate = toZonedTime(date, timezone);
   const dayStart = startOfDay(zonedDate);
   
   if (!shifts || shifts.length === 0) {
@@ -47,7 +47,7 @@ export function generate15MinSlots(
       { step: 15 }
     );
     // Convert back to UTC
-    return intervalSlots.map(slot => zonedTimeToUtc(slot, timezone));
+    return intervalSlots.map(slot => fromZonedTime(slot, timezone));
   }
 
   // Generate slots for each shift
@@ -71,7 +71,7 @@ export function generate15MinSlots(
     );
     
     // Convert to UTC
-    const utcSlots = shiftSlots.map(slot => zonedTimeToUtc(slot, timezone));
+    const utcSlots = shiftSlots.map(slot => fromZonedTime(slot, timezone));
     slots.push(...utcSlots);
   }
 
@@ -87,7 +87,7 @@ export function isWithinShift(
     return true; // Full day available
   }
 
-  const zonedDate = utcToZonedTime(dateTime, timezone);
+  const zonedDate = toZonedTime(dateTime, timezone);
   const timeStr = formatTime(zonedDate);
 
   for (const shift of shifts) {
