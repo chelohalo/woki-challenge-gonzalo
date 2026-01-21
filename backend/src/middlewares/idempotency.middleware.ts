@@ -30,7 +30,9 @@ export async function idempotencyMiddleware(
     if (reply.statusCode >= 200 && reply.statusCode < 300) {
       // Cache successful response
       const now = formatISODateTime(new Date());
-      storeIdempotencyResponse(idempotencyKey, payload, now).catch(console.error);
+      storeIdempotencyResponse(idempotencyKey, payload, now).catch((err) => {
+        request.log.error({ err, idempotencyKey }, 'Failed to store idempotency response');
+      });
     }
     return originalSend(payload);
   };

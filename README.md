@@ -13,6 +13,8 @@ A lean, high-signal prototype of Woki's reservation engine focused on atomic, ef
   - Configurable reservation duration by party size
   - Advance booking policy enforcement
   - Timezone-aware scheduling with IANA timezones
+  - Structured logging with request tracing (requestId)
+  - Application metrics and observability
 
 ## 📁 Project Structure
 
@@ -220,6 +222,48 @@ Cancel a reservation by ID.
 
 ---
 
+#### GET `/health`
+Health check endpoint.
+
+**200 OK**
+```json
+{
+  "status": "ok",
+  "timestamp": "2025-09-08T19:50:21-03:00"
+}
+```
+
+---
+
+#### GET `/metrics`
+Get application metrics and statistics.
+
+**200 OK**
+```json
+{
+  "timestamp": "2025-09-08T19:50:21-03:00",
+  "metrics": {
+    "reservationsCreated": 42,
+    "reservationsCancelled": 5,
+    "reservationsUpdated": 3,
+    "conflicts": 2,
+    "idempotentHits": 8,
+    "availabilityQueries": 156,
+    "errors": 1,
+    "summary": {
+      "total": 50,
+      "created": 42,
+      "cancelled": 5,
+      "updated": 3,
+      "conflictRate": 4.0,
+      "idempotencyHitRate": 19.05
+    }
+  }
+}
+```
+
+---
+
 #### PATCH `/reservations/:id`
 Update an existing reservation.
 
@@ -409,6 +453,50 @@ The system uses a **Best Fit Decreasing** strategy for table assignment:
 - Party size: 8 guests
 - Available tables: T1 (maxSize=4), T2 (maxSize=4), T3 (maxSize=3), T4 (maxSize=3)
 - Result: Assigns T1 + T2 (total maxSize=8, perfect fit) or T3 + T4 + T1 (if T1+T2 unavailable)
+
+## 📊 Observability
+
+### Logging
+
+The application uses **structured logging** with Pino:
+
+- **Request Tracing**: Each request gets a unique `requestId` (provided via `X-Request-Id` header or auto-generated)
+- **Structured Logs**: All logs include context (requestId, operation, outcome, durationMs)
+- **Log Levels**: 
+  - `debug`: Detailed information (development only)
+  - `info`: Normal operations
+  - `warn`: Expected errors (4xx)
+  - `error`: Unexpected errors (5xx)
+
+**Example log entry:**
+```json
+{
+  "level": 30,
+  "time": 1725807021000,
+  "requestId": "req_ABC12345",
+  "restaurantId": "R1",
+  "sectorId": "S1",
+  "partySize": 4,
+  "operation": "create_reservation",
+  "outcome": "success",
+  "durationMs": 45,
+  "msg": "Reservation created"
+}
+```
+
+### Metrics
+
+The application tracks basic metrics:
+
+- **Reservations**: Created, cancelled, updated
+- **Conflicts**: No capacity errors (409)
+- **Idempotency**: Cache hits
+- **Availability**: Query count
+- **Errors**: Total error count
+
+Access metrics via `GET /metrics` endpoint. Metrics are in-memory and reset on server restart.
+
+**Note**: For production, consider integrating with Prometheus, StatsD, or similar metrics systems.
 
 ## 📄 License
 
