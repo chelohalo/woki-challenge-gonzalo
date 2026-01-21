@@ -7,6 +7,12 @@ A lean, high-signal prototype of Woki's reservation engine focused on atomic, ef
 - **Backend**: Fastify + TypeScript + Drizzle ORM + Turso (SQLite)
 - **Frontend**: Next.js 14 + React + Tailwind CSS
 - **Database**: Turso (separate databases for dev/prod)
+- **Key Features**:
+  - Atomic table assignment with in-memory locks
+  - Idempotent operations via `Idempotency-Key` header
+  - Configurable reservation duration by party size
+  - Advance booking policy enforcement
+  - Timezone-aware scheduling with IANA timezones
 
 ## 📁 Project Structure
 
@@ -60,6 +66,15 @@ cd backend
 npm test
 ```
 
+The test suite includes:
+- Happy path scenarios
+- Concurrency handling (double-booking prevention)
+- Idempotency validation
+- Time boundary checks (adjacent reservations)
+- Shift validation
+- Advance booking policy validation
+- Reservation cancellation and slot availability
+
 ## 📝 API Documentation
 
 ### Endpoints
@@ -80,13 +95,26 @@ Get available time slots for a restaurant sector on a specific date.
   "durationMinutes": 90,
   "slots": [
     {
-      "start": "2025-09-08T20:00:00Z",
+      "start": "2025-09-08T20:00:00-03:00",
       "available": true,
       "tables": ["T1", "T2"]
+    },
+    {
+      "start": "2025-09-08T20:15:00-03:00",
+      "available": false,
+      "reason": "no_capacity"
     }
   ]
 }
 ```
+
+**Note:** 
+- `durationMinutes` varies based on party size if duration rules are configured:
+  - ≤2 guests → 75 minutes
+  - ≤4 guests → 90 minutes
+  - ≤8 guests → 120 minutes
+  - >8 guests → 150 minutes
+- `tables` array may contain multiple table IDs if a combination is needed (when no single table fits the party size)
 
 #### POST `/reservations`
 Create a new reservation.
@@ -110,21 +138,137 @@ Create a new reservation.
 }
 ```
 
+**201 Created**
+Returns the created reservation with assigned table(s) and calculated end time.
+
+**Response example:**
+```json
+{
+  "id": "RES_001",
+  "restaurantId": "R1",
+  "sectorId": "S1",
+  "tableIds": ["T3", "T4"],
+  "partySize": 8,
+  "start": "2025-09-08T20:00:00-03:00",
+  "end": "2025-09-08T21:30:00-03:00",
+  "status": "CONFIRMED",
+  "customer": { "name": "John Doe", "phone": "...", "email": "..." },
+  "createdAt": "2025-09-08T19:50:21-03:00",
+  "updatedAt": "2025-09-08T19:50:21-03:00"
+}
+```
+
+**Note:** `tableIds` may contain multiple tables if no single table can accommodate the party size. The system automatically finds the best combination (minimizing number of tables and wasted capacity).
+
+**400 Bad Request**
+```json
+{ "error": "invalid_format", "detail": "Reservations must be made at least 30 minutes in advance" }
+```
+
+**409 Conflict**
+```json
+{ "error": "no_capacity", "detail": "No available table fits party size at requested time" }
+```
+
+**422 Unprocessable Entity**
+```json
+{ "error": "outside_service_window", "detail": "Requested time is outside shifts" }
+```
+
+**Note:** The system validates:
+- Advance booking policy (min/max advance time if configured)
+- Reservation duration is calculated based on party size
+- Time must be within restaurant shifts
+
 #### GET `/reservations/day`
 Get all reservations for a specific day.
 
 **Query Parameters:**
 - `restaurantId` (string, required): Restaurant ID
 - `date` (string, required): Date in YYYY-MM-DD format
-- `sectorId` (string, optional): Filter by sector
+- `sectorId` (string, optional): Filter by sector (if omitted, returns all sectors)
+
+**200 OK**
+```json
+{
+  "date": "2025-09-08",
+  "items": [
+    {
+      "id": "RES_001",
+      "sectorId": "S1",
+      "tableIds": ["T4"],
+      "partySize": 4,
+      "start": "2025-09-08T20:00:00-03:00",
+      "end": "2025-09-08T21:30:00-03:00",
+      "status": "CONFIRMED",
+      "customer": {
+        "name": "John Doe",
+        "phone": "+54 9 11 5555-1234",
+        "email": "john@example.com"
+      },
+      "createdAt": "2025-09-08T19:50:21-03:00",
+      "updatedAt": "2025-09-08T19:50:21-03:00"
+    }
+  ]
+}
+```
 
 #### DELETE `/reservations/:id`
 Cancel a reservation by ID.
 
+**204 No Content**
+
+---
+
+#### PATCH `/reservations/:id`
+Update an existing reservation.
+
+**Headers:**
+- `idempotency-key` (optional): Key for idempotent requests
+
+**Body (all fields optional):**
+```json
+{
+  "sectorId": "S2",
+  "partySize": 6,
+  "startDateTimeISO": "2025-09-08T21:00:00-03:00",
+  "customer": {
+    "name": "Jane Doe",
+    "phone": "+54 9 11 5555-5678",
+    "email": "jane@example.com"
+  },
+  "notes": "Updated notes"
+}
+```
+
+**200 OK**
+Returns the updated reservation (same format as POST response).
+
+**409 Conflict**
+```json
+{ "error": "no_capacity", "detail": "No available table for the updated reservation parameters" }
+```
+
+**400 Bad Request**
+```json
+{ "error": "invalid_format", "detail": "Reservations must be made at least 30 minutes in advance" }
+```
+
+**422 Unprocessable Entity**
+```json
+{ "error": "outside_service_window", "detail": "Requested time is outside shifts" }
+```
+
+**Note:** When updating a reservation:
+- If `sectorId`, `startDateTimeISO`, or `partySize` changes, the system will re-assign tables
+- All validations (shifts, advance booking policy) are re-applied
+- The reservation duration is recalculated based on the new party size
+- Idempotency is supported via `Idempotency-Key` header
+
 ## 🎯 Core Features
 
 - [x] Availability endpoint (15-min slots)
-- [x] Table assignment algorithm (Best Fit Decreasing strategy)
+- [x] Table assignment algorithm (Best Fit Decreasing strategy with table combinations)
 - [x] Reservation CRUD (Create, Read, Cancel)
 - [x] Idempotency support (via `Idempotency-Key` header)
 - [x] Concurrency handling (in-memory locks with fail-fast)
@@ -137,6 +281,10 @@ Cancel a reservation by ID.
 - [x] Dark mode support
 - [x] Responsive design
 - [x] Public deployment (Railway + Vercel)
+- [x] **BONUS 5**: Table combinations within a sector (assign multiple tables when no single table fits)
+- [x] **BONUS 6**: Advance booking policy (min/max advance time)
+- [x] **BONUS 7**: Variable duration by party size (≤2→75min, ≤4→90min, ≤8→120min, >8→150min)
+- [x] **BONUS 9**: Edit reservation (PATCH endpoint with re-validation and re-assignment)
 
 ## 🚀 Deployment
 
@@ -210,6 +358,57 @@ Cancel a reservation by ID.
 - [ ] CORS is configured correctly (check browser console)
 - [ ] Database migrations applied
 - [ ] Seed data loaded (if needed)
+
+## 🔧 Configuration
+
+### Restaurant Settings
+
+Restaurants can be configured with the following optional settings:
+
+**Duration Rules** (`durationRules`): Define reservation duration based on party size
+```json
+{
+  "durationRules": [
+    { "maxPartySize": 2, "durationMinutes": 75 },
+    { "maxPartySize": 4, "durationMinutes": 90 },
+    { "maxPartySize": 8, "durationMinutes": 120 },
+    { "maxPartySize": 999, "durationMinutes": 150 }
+  ]
+}
+```
+
+**Advance Booking Policy**:
+- `minAdvanceMinutes`: Minimum minutes in advance (e.g., 30)
+- `maxAdvanceDays`: Maximum days in advance (e.g., 30)
+
+If not set, these validations are skipped.
+
+**Shifts**: Define service windows
+```json
+{
+  "shifts": [
+    { "start": "12:00", "end": "16:00" },
+    { "start": "20:00", "end": "23:45" }
+  ]
+}
+```
+
+If not set, the restaurant operates 24/7 (with respect to reservation duration).
+
+### Table Assignment Strategy
+
+The system uses a **Best Fit Decreasing** strategy for table assignment:
+
+1. **Single Table (Preferred)**: First attempts to find a single table where `minSize ≤ partySize ≤ maxSize`
+2. **Table Combinations (Fallback)**: If no single table fits, searches for combinations of 2-5 tables that together can accommodate the party size
+3. **Optimization**: Prefers combinations that:
+   - Minimize the number of tables used
+   - Minimize wasted capacity (prefer tables with `maxSize` closest to `partySize`)
+
+**Example:**
+- Party size: 8 guests
+- Available tables: T1 (maxSize=4), T2 (maxSize=4), T3 (maxSize=3), T4 (maxSize=3)
+- Result: Assigns T1 + T2 (total maxSize=8, perfect fit) or T3 + T4 + T1 (if T1+T2 unavailable)
 
 ## 📄 License
 

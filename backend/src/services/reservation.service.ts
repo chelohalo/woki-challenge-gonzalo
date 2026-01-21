@@ -8,6 +8,8 @@ import {
   cancelReservation as cancelReservationRepo,
 } from '../repositories/reservation.repository.js';
 import { addMinutesToDate, formatISODateTime, isWithinShift } from '../utils/datetime.js';
+import { calculateReservationDuration } from '../utils/duration.js';
+import { validateAdvanceBooking } from '../utils/booking-policy.js';
 import { acquireLock } from '../utils/locks.js';
 import { Errors } from '../utils/errors.js';
 import type { CustomerInput } from '../types/index.js';
@@ -41,25 +43,36 @@ export async function createReservationService(data: {
       throw Errors.OUTSIDE_SERVICE_WINDOW();
     }
 
-    // 3. Get reservation duration from restaurant (default to 90 if not set)
-    const reservationDurationMinutes = restaurant.reservationDurationMinutes || 90;
+    // 3. Validate advance booking policy
+    validateAdvanceBooking(
+      data.startDateTimeISO,
+      restaurant.minAdvanceMinutes ?? undefined,
+      restaurant.maxAdvanceDays ?? undefined
+    );
 
-    // 4. Assign table (within lock to prevent race conditions)
-    const tableId = await assignTable(
+    // 4. Calculate reservation duration based on party size and rules
+    const reservationDurationMinutes = calculateReservationDuration(
+      data.partySize,
+      restaurant.durationRules || undefined,
+      restaurant.reservationDurationMinutes || 90
+    );
+
+    // 5. Assign table(s) (within lock to prevent race conditions)
+    const tableIds = await assignTable(
       data.sectorId,
       data.startDateTimeISO,
       data.partySize,
       reservationDurationMinutes
     );
-    if (!tableId) {
+    if (!tableIds || tableIds.length === 0) {
       throw Errors.NO_CAPACITY();
     }
 
-    // 5. Calculate end time
+    // 6. Calculate end time
     const endDate = addMinutesToDate(startDate, reservationDurationMinutes);
     const endDateTimeISO = formatISODateTime(endDate);
 
-    // 6. Create reservation
+    // 7. Create reservation
     const now = formatISODateTime(new Date());
     const reservationId = `RES_${nanoid(8).toUpperCase()}`;
 
@@ -67,7 +80,7 @@ export async function createReservationService(data: {
       id: reservationId,
       restaurantId: data.restaurantId,
       sectorId: data.sectorId,
-      tableIds: [tableId],
+      tableIds: tableIds,
       partySize: data.partySize,
       startDateTime: data.startDateTimeISO,
       endDateTime: endDateTimeISO,
@@ -84,7 +97,7 @@ export async function createReservationService(data: {
       throw new Error('Failed to create reservation');
     }
 
-    // 7. Format response
+    // 8. Format response
     return {
       id: reservation.id,
       restaurantId: reservation.restaurantId,
@@ -157,4 +170,155 @@ export async function getReservationsByDayService(
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
   }));
+}
+
+export async function updateReservationService(
+  id: string,
+  data: {
+    sectorId?: string;
+    partySize?: number;
+    startDateTimeISO?: string;
+    customer?: CustomerInput;
+    notes?: string;
+  }
+) {
+  // Get existing reservation
+  const existingReservation = await getReservationById(id);
+  if (!existingReservation) {
+    throw Errors.NOT_FOUND('Reservation');
+  }
+
+  if (existingReservation.status === 'CANCELLED') {
+    throw Errors.INVALID_FORMAT('Cannot update a cancelled reservation');
+  }
+
+  // Get restaurant
+  const restaurant = await getRestaurantById(existingReservation.restaurantId);
+  if (!restaurant) {
+    throw Errors.NOT_FOUND('Restaurant');
+  }
+
+  // Determine what changed
+  const newSectorId = data.sectorId || existingReservation.sectorId;
+  const newPartySize = data.partySize ?? existingReservation.partySize;
+  const newStartDateTimeISO = data.startDateTimeISO || existingReservation.startDateTime;
+  const newCustomer = data.customer || {
+    name: existingReservation.customerName,
+    phone: existingReservation.customerPhone,
+    email: existingReservation.customerEmail,
+  };
+  const newNotes = data.notes !== undefined ? data.notes : (existingReservation.notes || undefined);
+
+  // Check if sector changed
+  if (data.sectorId && data.sectorId !== existingReservation.sectorId) {
+    const sector = await getSectorById(data.sectorId);
+    if (!sector) {
+      throw Errors.NOT_FOUND('Sector');
+    }
+  }
+
+  // Validate time is within shifts (if time changed)
+  if (data.startDateTimeISO) {
+    const startDate = new Date(newStartDateTimeISO);
+    if (!isWithinShift(startDate, restaurant.timezone, restaurant.shifts || undefined)) {
+      throw Errors.OUTSIDE_SERVICE_WINDOW();
+    }
+
+    // Validate advance booking policy
+    validateAdvanceBooking(
+      newStartDateTimeISO,
+      restaurant.minAdvanceMinutes ?? undefined,
+      restaurant.maxAdvanceDays ?? undefined
+    );
+  }
+
+  // Calculate new duration based on party size
+  const reservationDurationMinutes = calculateReservationDuration(
+    newPartySize,
+    restaurant.durationRules || undefined,
+    restaurant.reservationDurationMinutes || 90
+  );
+
+  // Acquire lock for the new slot (or existing if time didn't change)
+  const releaseLock = await acquireLock(newSectorId, newStartDateTimeISO);
+
+  try {
+    // If time or sector changed, need to re-assign table
+    let newTableIds = existingReservation.tableIds;
+    
+    if (data.startDateTimeISO || data.sectorId || data.partySize !== undefined) {
+      // Release old table assignment by checking if we need to reassign
+      const needsReassignment = 
+        data.startDateTimeISO !== undefined ||
+        data.sectorId !== undefined ||
+        (data.partySize !== undefined && data.partySize !== existingReservation.partySize);
+
+      if (needsReassignment) {
+        // Assign new table(s) (exclude current reservation from overlap check)
+        const assignedTableIds = await assignTable(
+          newSectorId,
+          newStartDateTimeISO,
+          newPartySize,
+          reservationDurationMinutes,
+          id // Exclude current reservation
+        );
+        
+        if (!assignedTableIds || assignedTableIds.length === 0) {
+          throw Errors.NO_CAPACITY('No available table(s) for the updated reservation parameters');
+        }
+        
+        newTableIds = assignedTableIds;
+      }
+    }
+
+    // Calculate new end time
+    const startDate = new Date(newStartDateTimeISO);
+    const endDate = addMinutesToDate(startDate, reservationDurationMinutes);
+    const endDateTimeISO = formatISODateTime(endDate);
+
+    // Update reservation
+    const { updateReservation } = await import('../repositories/reservation.repository.js');
+    const now = formatISODateTime(new Date());
+    
+    await updateReservation(id, {
+      sectorId: newSectorId,
+      tableIds: newTableIds,
+      partySize: newPartySize,
+      startDateTime: newStartDateTimeISO,
+      endDateTime: endDateTimeISO,
+      customerName: newCustomer.name,
+      customerPhone: newCustomer.phone,
+      customerEmail: newCustomer.email,
+      notes: newNotes,
+      updatedAt: now,
+    });
+
+    // Return updated reservation
+    const updated = await getReservationById(id);
+    if (!updated) {
+      throw new Error('Failed to retrieve updated reservation');
+    }
+
+    return {
+      id: updated.id,
+      restaurantId: updated.restaurantId,
+      sectorId: updated.sectorId,
+      tableIds: updated.tableIds,
+      partySize: updated.partySize,
+      start: updated.startDateTime,
+      end: updated.endDateTime,
+      status: updated.status,
+      customer: {
+        name: updated.customerName,
+        phone: updated.customerPhone,
+        email: updated.customerEmail,
+        createdAt: updated.createdAt,
+        updatedAt: updated.updatedAt,
+      },
+      createdAt: updated.createdAt,
+      updatedAt: updated.updatedAt,
+    };
+  } finally {
+    releaseLock();
+  }
 }

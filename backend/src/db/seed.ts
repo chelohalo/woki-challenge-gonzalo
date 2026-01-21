@@ -23,7 +23,15 @@ async function seed() {
       { start: '12:00', end: '16:00' },
       { start: '20:00', end: '23:45' },
     ],
-    reservationDurationMinutes: 90,
+    reservationDurationMinutes: 90, // Fallback duration
+    durationRules: [
+      { maxPartySize: 2, durationMinutes: 75 },
+      { maxPartySize: 4, durationMinutes: 90 },
+      { maxPartySize: 8, durationMinutes: 120 },
+      { maxPartySize: 999, durationMinutes: 150 }, // >8 guests
+    ],
+    minAdvanceMinutes: 30, // At least 30 minutes in advance
+    maxAdvanceDays: 30, // Up to 30 days in advance
     createdAt: baseDate,
     updatedAt: baseDate,
   });
@@ -90,6 +98,25 @@ async function seed() {
       name: 'Table 5',
       minSize: 2,
       maxSize: 2,
+      createdAt: baseDate,
+      updatedAt: baseDate,
+    },
+    // Additional tables for testing combinations
+    {
+      id: 'T6',
+      sectorId: 'S1',
+      name: 'Table 6',
+      minSize: 2,
+      maxSize: 3,
+      createdAt: baseDate,
+      updatedAt: baseDate,
+    },
+    {
+      id: 'T7',
+      sectorId: 'S1',
+      name: 'Table 7',
+      minSize: 2,
+      maxSize: 3,
       createdAt: baseDate,
       updatedAt: baseDate,
     },

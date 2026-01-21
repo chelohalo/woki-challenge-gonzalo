@@ -1,6 +1,6 @@
 import { db } from '../db/index.js';
 import { reservations } from '../db/schema.js';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, ne } from 'drizzle-orm';
 import { getZonedDayStartUTC } from '../utils/datetime.js';
 
 export async function getReservationById(id: string) {
@@ -53,14 +53,22 @@ export async function getReservationsByDay(
 export async function getOverlappingReservations(
   tableIds: string[],
   startDateTime: string,
-  endDateTime: string
+  endDateTime: string,
+  excludeReservationId?: string
 ) {
   // Get all confirmed reservations
   // We need to check ALL reservations, not just by date, because overlaps can span days
+  const conditions = [eq(reservations.status, 'CONFIRMED')];
+  
+  if (excludeReservationId) {
+    // Exclude the reservation being updated
+    conditions.push(ne(reservations.id, excludeReservationId));
+  }
+
   const allReservations = await db
     .select()
     .from(reservations)
-    .where(eq(reservations.status, 'CONFIRMED'));
+    .where(conditions.length > 1 ? and(...conditions) : conditions[0]);
 
   // Filter by overlap and table IDs using timestamp comparison
   const startTime = new Date(startDateTime).getTime();
@@ -103,5 +111,38 @@ export async function cancelReservation(id: string, updatedAt: string) {
   await db
     .update(reservations)
     .set({ status: 'CANCELLED', updatedAt })
+    .where(eq(reservations.id, id));
+}
+
+export async function updateReservation(
+  id: string,
+  data: {
+    sectorId?: string;
+    tableIds?: string[];
+    partySize?: number;
+    startDateTime?: string;
+    endDateTime?: string;
+    customerName?: string;
+    customerPhone?: string;
+    customerEmail?: string;
+    notes?: string;
+    updatedAt: string;
+  }
+) {
+  const updateData: any = { updatedAt: data.updatedAt };
+  
+  if (data.sectorId !== undefined) updateData.sectorId = data.sectorId;
+  if (data.tableIds !== undefined) updateData.tableIds = data.tableIds;
+  if (data.partySize !== undefined) updateData.partySize = data.partySize;
+  if (data.startDateTime !== undefined) updateData.startDateTime = data.startDateTime;
+  if (data.endDateTime !== undefined) updateData.endDateTime = data.endDateTime;
+  if (data.customerName !== undefined) updateData.customerName = data.customerName;
+  if (data.customerPhone !== undefined) updateData.customerPhone = data.customerPhone;
+  if (data.customerEmail !== undefined) updateData.customerEmail = data.customerEmail;
+  if (data.notes !== undefined) updateData.notes = data.notes;
+
+  await db
+    .update(reservations)
+    .set(updateData)
     .where(eq(reservations.id, id));
 }

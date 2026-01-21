@@ -35,6 +35,15 @@ async function seedTestData() {
       { start: '12:00', end: '16:00' },
       { start: '20:00', end: '23:45' },
     ],
+    reservationDurationMinutes: 90,
+    durationRules: [
+      { maxPartySize: 2, durationMinutes: 75 },
+      { maxPartySize: 4, durationMinutes: 90 },
+      { maxPartySize: 8, durationMinutes: 120 },
+      { maxPartySize: 999, durationMinutes: 150 },
+    ],
+    minAdvanceMinutes: null, // Disable for tests
+    maxAdvanceDays: null, // Disable for tests
     createdAt: baseDate,
     updatedAt: baseDate,
   });
@@ -376,5 +385,42 @@ describe('Reservation Service', () => {
         expect(slot.available).toBe(true);
       }
     });
+  });
+
+  describe('Table Combinations', () => {
+    it('should assign multiple tables when no single table fits', async () => {
+      // Create a reservation for party size 8 (no single table fits, need combination)
+      const startDateTime = '2025-09-08T20:00:00-03:00';
+
+      const reservation = await createReservationService({
+        restaurantId: testRestaurantId,
+        sectorId: testSectorId,
+        partySize: 8, // Larger than any single table maxSize (which is 4)
+        startDateTimeISO: startDateTime,
+        customer: testCustomer,
+      });
+
+      expect(reservation).toBeDefined();
+      expect(reservation.status).toBe('CONFIRMED');
+      expect(reservation.tableIds.length).toBeGreaterThan(1); // Should use multiple tables
+      expect(reservation.partySize).toBe(8);
+
+      // Verify total capacity of assigned tables can accommodate party size
+      const { getTableById } = await import('../src/repositories/table.repository.js');
+      let totalMinCapacity = 0;
+      let totalMaxCapacity = 0;
+
+      for (const tableId of reservation.tableIds) {
+        const table = await getTableById(tableId);
+        if (table) {
+          totalMinCapacity += table.minSize;
+          totalMaxCapacity += table.maxSize;
+        }
+      }
+
+      expect(totalMinCapacity).toBeLessThanOrEqual(8);
+      expect(totalMaxCapacity).toBeGreaterThanOrEqual(8);
+    });
+
   });
 });

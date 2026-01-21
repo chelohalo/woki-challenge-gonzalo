@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { getAvailability } from '../services/availability.service.js';
 import { getRestaurantById } from '../repositories/restaurant.repository.js';
+import { calculateReservationDuration } from '../utils/duration.js';
 import { availabilityQuerySchema } from '../schemas/reservation.schema.js';
 import { Errors } from '../utils/errors.js';
 
@@ -23,7 +24,12 @@ export async function availabilityRoutes(fastify: FastifyInstance) {
         query.partySize
       );
 
-      const reservationDurationMinutes = restaurant.reservationDurationMinutes || 90;
+      // Calculate duration for this specific party size
+      const reservationDurationMinutes = calculateReservationDuration(
+        query.partySize,
+        restaurant.durationRules || undefined,
+        restaurant.reservationDurationMinutes || 90
+      );
 
       return {
         slotMinutes: 15,

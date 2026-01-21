@@ -25,3 +25,15 @@ export const reservationsDayQuerySchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   sectorId: z.string().optional(),
 });
+
+export const updateReservationSchema = z.object({
+  sectorId: z.string().min(1).optional(),
+  partySize: z.number().int().positive().min(1).max(20).optional(),
+  startDateTimeISO: z.string().datetime().optional(),
+  customer: z.object({
+    name: z.string().min(1),
+    phone: z.string().min(1),
+    email: z.string().email(),
+  }).optional(),
+  notes: z.string().optional(),
+});

@@ -3,10 +3,12 @@ import {
   createReservationService,
   cancelReservationService,
   getReservationsByDayService,
+  updateReservationService,
 } from '../services/reservation.service.js';
 import {
   createReservationSchema,
   reservationsDayQuerySchema,
+  updateReservationSchema,
 } from '../schemas/reservation.schema.js';
 import { getIdempotencyResponse, storeIdempotencyResponse } from '../repositories/idempotency.repository.js';
 import { formatISODateTime } from '../utils/datetime.js';
@@ -85,6 +87,47 @@ export async function reservationsRoutes(fastify: FastifyInstance) {
         date: query.date,
         items,
       };
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        throw Errors.INVALID_FORMAT(error.message);
+      }
+      if (error instanceof Error && 'statusCode' in error) {
+        throw error;
+      }
+      fastify.log.error(error);
+      throw new Error('Internal server error');
+    }
+  });
+
+  fastify.patch('/reservations/:id', async (request, reply) => {
+    try {
+      // Check idempotency
+      const idempotencyKey = request.headers[IDEMPOTENCY_KEY_HEADER.toLowerCase()] as string;
+      if (idempotencyKey) {
+        const cached = await getIdempotencyResponse(idempotencyKey);
+        if (cached) {
+          return reply.status(200).send(cached.response);
+        }
+      }
+
+      const { id } = request.params as { id: string };
+      const body = updateReservationSchema.parse(request.body);
+
+      const reservation = await updateReservationService(id, {
+        sectorId: body.sectorId,
+        partySize: body.partySize,
+        startDateTimeISO: body.startDateTimeISO,
+        customer: body.customer,
+        notes: body.notes,
+      });
+
+      // Store idempotency response if key provided
+      if (idempotencyKey) {
+        const now = formatISODateTime(new Date());
+        await storeIdempotencyResponse(idempotencyKey, reservation, now);
+      }
+
+      reply.status(200).send(reservation);
     } catch (error: any) {
       if (error.name === 'ZodError') {
         throw Errors.INVALID_FORMAT(error.message);

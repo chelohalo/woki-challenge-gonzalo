@@ -1,7 +1,8 @@
 import { getRestaurantById } from '../repositories/restaurant.repository.js';
 import { getTablesBySector } from '../repositories/table.repository.js';
-import { getReservationsByDay } from '../repositories/reservation.repository.js';
+import { getReservationsByDay, getOverlappingReservations } from '../repositories/reservation.repository.js';
 import { generate15MinSlots, isWithinShift, addMinutesToDate, formatISODateTime } from '../utils/datetime.js';
+import { calculateReservationDuration } from '../utils/duration.js';
 import { Errors } from '../utils/errors.js';
 
 export interface AvailabilitySlot {
@@ -43,15 +44,24 @@ export async function getAvailability(
     restaurant.timezone
   );
 
-  // 5. Get reservation duration from restaurant (default to 90 if not set)
-  const reservationDurationMinutes = restaurant.reservationDurationMinutes || 90;
+  // 5. Calculate reservation duration for this party size
+  const reservationDurationMinutes = calculateReservationDuration(
+    partySize,
+    restaurant.durationRules || undefined,
+    restaurant.reservationDurationMinutes || 90
+  );
 
   // 6. Generate 15-minute slots for the day
+  // Use max duration from rules to ensure all possible slots are generated
+  const maxDuration = restaurant.durationRules && restaurant.durationRules.length > 0
+    ? Math.max(...restaurant.durationRules.map(r => r.durationMinutes))
+    : reservationDurationMinutes;
+
   const slots = generate15MinSlots(
     date,
     restaurant.timezone,
     restaurant.shifts || undefined,
-    reservationDurationMinutes
+    maxDuration
   );
 
   // 7. Process slots in memory (no additional DB queries)
@@ -59,6 +69,7 @@ export async function getAvailability(
 
   for (const slotStart of slots) {
     const slotStartISO = formatISODateTime(slotStart);
+    // Use party-size-specific duration for overlap checking
     const slotEnd = addMinutesToDate(slotStart, reservationDurationMinutes);
     const slotEndISO = formatISODateTime(slotEnd);
 
@@ -67,36 +78,146 @@ export async function getAvailability(
       continue; // Skip slots outside shifts
     }
 
-    // Check for available tables (in memory - no DB queries)
-    const availableTableIds: string[] = [];
+    // Check for available tables (single or combinations)
+    const slotStartTime = new Date(slotStartISO).getTime();
+    const slotEndTime = new Date(slotEndISO).getTime();
 
+    // First, try single tables
+    const availableSingleTables: string[] = [];
     for (const table of eligibleTables) {
-      // Check overlaps in memory using timestamp comparison
-      const slotStartTime = new Date(slotStartISO).getTime();
-      const slotEndTime = new Date(slotEndISO).getTime();
-
       const hasOverlap = allReservations.some((r) => {
         const rStartTime = new Date(r.startDateTime).getTime();
         const rEndTime = new Date(r.endDateTime).getTime();
-
-        // Overlap: (r.start < slotEnd) AND (r.end > slotStart)
         const overlaps = rStartTime < slotEndTime && rEndTime > slotStartTime;
         return overlaps && r.tableIds.includes(table.id);
       });
 
       if (!hasOverlap) {
-        availableTableIds.push(table.id);
+        availableSingleTables.push(table.id);
       }
     }
 
-    // Slot is available if there's at least one table without overlap
-    availability.push({
-      start: slotStartISO,
-      available: availableTableIds.length > 0,
-      tables: availableTableIds.length > 0 ? availableTableIds : undefined,
-      reason: availableTableIds.length === 0 ? 'no_capacity' : undefined,
-    });
+    // If single tables available, use them
+    if (availableSingleTables.length > 0) {
+      availability.push({
+        start: slotStartISO,
+        available: true,
+        tables: availableSingleTables,
+      });
+      continue;
+    }
+
+    // No single table fits - check for combinations
+    // Get all tables that could contribute (minSize <= partySize)
+    const candidateTables = tables.filter(t => t.minSize <= partySize);
+
+    // Try to find a combination (2-5 tables)
+    let foundCombination: string[] | null = null;
+    const maxTables = 5;
+
+    for (let numTables = 2; numTables <= maxTables && numTables <= candidateTables.length; numTables++) {
+      // Generate combinations and check availability
+      const combination = await findAvailableCombination(
+        candidateTables,
+        partySize,
+        numTables,
+        slotStartISO,
+        slotEndISO,
+        slotStartTime,
+        slotEndTime,
+        allReservations
+      );
+
+      if (combination) {
+        foundCombination = combination;
+        break; // Use first valid combination found
+      }
+    }
+
+    if (foundCombination) {
+      availability.push({
+        start: slotStartISO,
+        available: true,
+        tables: foundCombination.sort(), // Sort for consistency
+      });
+    } else {
+      availability.push({
+        start: slotStartISO,
+        available: false,
+        reason: 'no_capacity',
+      });
+    }
   }
 
   return availability;
+}
+
+/**
+ * Find an available combination of tables for a slot.
+ * Returns table IDs if a valid combination is found, null otherwise.
+ */
+async function findAvailableCombination(
+  candidateTables: Array<{ id: string; minSize: number; maxSize: number }>,
+  partySize: number,
+  numTables: number,
+  slotStartISO: string,
+  slotEndISO: string,
+  slotStartTime: number,
+  slotEndTime: number,
+  allReservations: Array<{ startDateTime: string; endDateTime: string; tableIds: string[] }>
+): Promise<string[] | null> {
+  // Helper to generate combinations
+  function* generateCombinations(
+    arr: Array<{ id: string; minSize: number; maxSize: number }>,
+    k: number
+  ): Generator<string[]> {
+    if (k === 1) {
+      for (const item of arr) {
+        yield [item.id];
+      }
+      return;
+    }
+
+    for (let i = 0; i <= arr.length - k; i++) {
+      const rest = arr.slice(i + 1);
+      for (const combo of generateCombinations(rest, k - 1)) {
+        yield [arr[i].id, ...combo];
+      }
+    }
+  }
+
+  // Try all combinations of numTables
+  for (const tableIds of generateCombinations(candidateTables, numTables)) {
+    // Check capacity
+    const totalMinCapacity = tableIds.reduce((sum, tid) => {
+      const table = candidateTables.find(t => t.id === tid);
+      return sum + (table?.minSize || 0);
+    }, 0);
+
+    const totalMaxCapacity = tableIds.reduce((sum, tid) => {
+      const table = candidateTables.find(t => t.id === tid);
+      return sum + (table?.maxSize || 0);
+    }, 0);
+
+    // Must have enough capacity
+    if (totalMinCapacity > partySize || totalMaxCapacity < partySize) {
+      continue;
+    }
+
+    // Check for overlaps
+    const hasOverlap = allReservations.some((r) => {
+      const rStartTime = new Date(r.startDateTime).getTime();
+      const rEndTime = new Date(r.endDateTime).getTime();
+      const overlaps = rStartTime < slotEndTime && rEndTime > slotStartTime;
+
+      // Check if any table in the combination overlaps with any table in the reservation
+      return overlaps && r.tableIds.some(tid => tableIds.includes(tid));
+    });
+
+    if (!hasOverlap) {
+      return tableIds.sort(); // Found valid combination
+    }
+  }
+
+  return null;
 }
