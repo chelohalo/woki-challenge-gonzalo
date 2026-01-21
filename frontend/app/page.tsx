@@ -6,6 +6,8 @@ import { AvailabilityGrid } from '../src/components/AvailabilityGrid';
 import { ReservationForm } from '../src/components/ReservationForm';
 import { ReservationsList } from '../src/components/ReservationsList';
 import { ThemeToggle } from '../src/components/ThemeToggle';
+import { Spinner } from '../src/components/Spinner';
+import { useApiLoading } from '../src/hooks/useApiLoading';
 import { availabilityApi, reservationsApi } from '../src/lib/api';
 import type { AvailabilitySlot, Reservation } from '../src/types';
 
@@ -25,6 +27,7 @@ export default function Home() {
   const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isApiLoading = useApiLoading();
 
   const dateString = format(selectedDate, 'yyyy-MM-dd');
 
@@ -89,6 +92,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
+      {isApiLoading && <Spinner />}
       <ThemeToggle />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}

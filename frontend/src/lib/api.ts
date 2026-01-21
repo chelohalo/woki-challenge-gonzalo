@@ -1,44 +1,61 @@
+import { startLoading, stopLoading } from '../hooks/useApiLoading';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export const api = {
   async get<T>(path: string): Promise<T> {
-    const response = await fetch(`${API_URL}${path}`);
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`API Error: ${response.statusText} - ${errorText}`);
+    startLoading();
+    try {
+      const response = await fetch(`${API_URL}${path}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API Error: ${response.statusText} - ${errorText}`);
+      }
+      return response.json();
+    } finally {
+      stopLoading();
     }
-    return response.json();
   },
 
   async post<T>(path: string, body: unknown, idempotencyKey?: string): Promise<T> {
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-    };
-    
-    if (idempotencyKey) {
-      headers['idempotency-key'] = idempotencyKey;
-    }
+    startLoading();
+    try {
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (idempotencyKey) {
+        headers['idempotency-key'] = idempotencyKey;
+      }
 
-    const response = await fetch(`${API_URL}${path}`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body),
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`API Error: ${response.statusText} - ${errorText}`);
+      const response = await fetch(`${API_URL}${path}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API Error: ${response.statusText} - ${errorText}`);
+      }
+      return response.json();
+    } finally {
+      stopLoading();
     }
-    return response.json();
   },
 
   async delete(path: string): Promise<void> {
-    const response = await fetch(`${API_URL}${path}`, {
-      method: 'DELETE',
-    });
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`API Error: ${response.statusText} - ${errorText}`);
+    startLoading();
+    try {
+      const response = await fetch(`${API_URL}${path}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API Error: ${response.statusText} - ${errorText}`);
+      }
+    } finally {
+      stopLoading();
     }
   },
 };
