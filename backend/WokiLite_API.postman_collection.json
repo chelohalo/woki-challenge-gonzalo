@@ -322,7 +322,7 @@
               "host": ["{{base_url}}"],
               "path": ["reservations"]
             },
-            "description": "Create a new reservation. For large groups (partySize >= largeGroupThreshold), creates a PENDING hold that requires approval."
+            "description": "Create a new reservation. For large groups (partySize >= largeGroupThreshold), creates a PENDING hold that requires approval.\n\n**Date Format:** Accepts ISO 8601 datetime with timezone offset (e.g., `2025-01-25T20:00:00-03:00`) or UTC with Z (e.g., `2025-01-25T23:00:00Z`)."
           },
           "response": [
             {
@@ -554,7 +554,7 @@
                 }
               ]
             },
-            "description": "Update an existing reservation. All fields are optional. If sectorId, startDateTimeISO, or partySize changes, tables will be re-assigned."
+            "description": "Update an existing reservation. All fields are optional. If sectorId, startDateTimeISO, or partySize changes, tables will be re-assigned.\n\n**Date Format:** Accepts ISO 8601 datetime with timezone offset (e.g., `2025-01-25T20:00:00-03:00`) or UTC with Z (e.g., `2025-01-25T23:00:00Z`)."
           },
           "response": [
             {

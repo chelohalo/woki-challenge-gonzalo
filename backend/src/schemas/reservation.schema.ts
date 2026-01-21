@@ -4,7 +4,7 @@ export const createReservationSchema = z.object({
   restaurantId: z.string().min(1),
   sectorId: z.string().min(1),
   partySize: z.number().int().positive().min(1).max(20),
-  startDateTimeISO: z.string().datetime(),
+  startDateTimeISO: z.string().datetime({ offset: true }),
   customer: z.object({
     name: z.string().min(1),
     phone: z.string().min(1),
@@ -29,7 +29,7 @@ export const reservationsDayQuerySchema = z.object({
 export const updateReservationSchema = z.object({
   sectorId: z.string().min(1).optional(),
   partySize: z.number().int().positive().min(1).max(20).optional(),
-  startDateTimeISO: z.string().datetime().optional(),
+  startDateTimeISO: z.string().datetime({ offset: true }).optional(),
   customer: z.object({
     name: z.string().min(1),
     phone: z.string().min(1),
