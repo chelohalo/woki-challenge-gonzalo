@@ -136,7 +136,80 @@ Cancel a reservation by ID.
 - [x] Database persistence (Turso/SQLite)
 - [x] Dark mode support
 - [x] Responsive design
-- [ ] Public deployment
+- [x] Public deployment (Railway + Vercel)
+
+## 🚀 Deployment
+
+### Backend Deployment (Railway)
+
+1. **Create Railway Account & Project**
+   - Go to [railway.app](https://railway.app)
+   - Sign up/login and create a new project
+   - Select "Deploy from GitHub repo" and connect your repository
+   - Choose the `backend` folder as the root directory
+
+2. **Configure Environment Variables**
+   Add these variables in Railway dashboard:
+   ```
+   DATABASE_URL=libsql://your-database-url.turso.io
+   TURSO_AUTH_TOKEN=your-turso-auth-token
+   NODE_ENV=production
+   PORT=3001
+   FRONTEND_URL=https://your-frontend-domain.vercel.app
+   ```
+
+3. **Deploy**
+   - Railway will automatically detect the `railway.json` config
+   - It will run `npm install && npm run build` and then `npm start`
+   - Wait for deployment to complete
+   - Copy the generated URL (e.g., `https://your-backend.railway.app`)
+
+### Frontend Deployment (Vercel)
+
+1. **Create Vercel Account & Project**
+   - Go to [vercel.com](https://vercel.com)
+   - Sign up/login and click "Add New Project"
+   - Import your GitHub repository
+   - Set **Root Directory** to `frontend`
+
+2. **Configure Environment Variables**
+   Add this variable in Vercel dashboard:
+   ```
+   NEXT_PUBLIC_API_URL=https://your-backend.railway.app
+   ```
+
+3. **Deploy**
+   - Click "Deploy"
+   - Vercel will automatically build and deploy your Next.js app
+   - Copy the generated URL (e.g., `https://your-app.vercel.app`)
+
+4. **Update Backend CORS**
+   - Go back to Railway dashboard
+   - Update `FRONTEND_URL` environment variable with your Vercel URL
+   - Redeploy the backend (or it will auto-redeploy)
+
+### Database Setup (Turso)
+
+1. **Create Production Database**
+   - Go to [turso.tech](https://turso.tech)
+   - Create a new database for production
+   - Copy the database URL and auth token
+
+2. **Run Migrations**
+   ```bash
+   cd backend
+   # Set production DATABASE_URL and TURSO_AUTH_TOKEN
+   npm run db:push
+   npm run db:seed  # Optional: seed initial data
+   ```
+
+### Post-Deployment Checklist
+
+- [ ] Backend health check: `https://your-backend.railway.app/health`
+- [ ] Frontend loads correctly
+- [ ] CORS is configured correctly (check browser console)
+- [ ] Database migrations applied
+- [ ] Seed data loaded (if needed)
 
 ## 📄 License
 

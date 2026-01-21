@@ -9,6 +9,7 @@ const envSchema = z.object({
   TURSO_AUTH_TOKEN: z.string().optional(),
   PORT: z.coerce.number().default(3001),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  FRONTEND_URL: z.string().url().optional(),
 });
 
 export const env = envSchema.parse(process.env);

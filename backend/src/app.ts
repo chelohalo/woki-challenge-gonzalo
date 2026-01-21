@@ -14,7 +14,7 @@ const app = Fastify({
 // CORS configuration
 app.register(cors, {
   origin: env.NODE_ENV === 'production' 
-    ? process.env.FRONTEND_URL || 'https://your-frontend-domain.com'
+    ? env.FRONTEND_URL || 'https://your-frontend-domain.com'
     : ['http://localhost:3000', 'http://127.0.0.1:3000'],
   credentials: true,
 });
