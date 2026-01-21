@@ -47,14 +47,14 @@ export function AvailabilityGrid({ slots, onSlotClick, selectedDate, durationMin
           <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 px-3">{title}</h3>
           <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-600 to-transparent"></div>
         </div>
-        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-6 xl:grid-cols-8 gap-3">
+        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8 gap-3">
           {groupSlots.map((slot) => (
             <button
               key={slot.start}
               onClick={() => onSlotClick(slot)}
               disabled={!slot.available}
               className={`
-                relative px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 text-center min-w-[75px]
+                relative px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 text-center w-full
                 transform hover:scale-105 active:scale-95
                 ${
                   slot.available
