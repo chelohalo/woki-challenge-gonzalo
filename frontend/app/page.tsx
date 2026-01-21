@@ -41,21 +41,6 @@ export default function Home() {
     }
   }, []);
 
-  const handleLogin = (token: string) => {
-    localStorage.setItem(AUTH_TOKEN_KEY, token);
-    setIsAuthenticated(true);
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem(AUTH_TOKEN_KEY);
-    setIsAuthenticated(false);
-  };
-
-  // Show login if not authenticated
-  if (!isAuthenticated) {
-    return <Login onLogin={handleLogin} />;
-  }
-
   const dateString = format(selectedDate, 'yyyy-MM-dd');
 
   const loadAvailability = async () => {
@@ -82,10 +67,23 @@ export default function Home() {
     }
   };
 
+  // Execute useEffect always, but only load data if authenticated
   useEffect(() => {
-    loadAvailability();
-    loadReservations();
-  }, [selectedDate, selectedSector, partySize]);
+    if (isAuthenticated) {
+      loadAvailability();
+      loadReservations();
+    }
+  }, [selectedDate, selectedSector, partySize, isAuthenticated]);
+
+  const handleLogin = (token: string) => {
+    localStorage.setItem(AUTH_TOKEN_KEY, token);
+    setIsAuthenticated(true);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+    setIsAuthenticated(false);
+  };
 
   const handleSlotClick = (slot: AvailabilitySlot) => {
     if (slot.available) {
@@ -116,6 +114,11 @@ export default function Home() {
   const changeDate = (days: number) => {
     setSelectedDate((prev) => (days > 0 ? addDays(prev, days) : subDays(prev, Math.abs(days))));
   };
+
+  // Show login if not authenticated - moved to end after all hooks
+  if (!isAuthenticated) {
+    return <Login onLogin={handleLogin} />;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
