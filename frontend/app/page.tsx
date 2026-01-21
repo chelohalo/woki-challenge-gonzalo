@@ -61,10 +61,24 @@ export default function Home() {
     setError(null);
     try {
       const data = await availabilityApi.get(RESTAURANT_ID, selectedSector, dateString, partySize);
-      setAvailability(data.slots);
+      // Sort slots by start time to ensure consistent ordering
+      const sortedSlots = [...data.slots].sort((a, b) => {
+        const timeA = new Date(a.start).getTime();
+        const timeB = new Date(b.start).getTime();
+        return timeA - timeB;
+      });
+      setAvailability(sortedSlots);
       setDurationMinutes(data.durationMinutes);
     } catch (err: any) {
-      setError(err.message || 'Failed to load availability');
+      const errorMessage = err.message || 'Failed to load availability';
+      // Extract more specific error message if available
+      let displayMessage = errorMessage;
+      if (errorMessage.includes('Sector not found') || errorMessage.includes('not_found')) {
+        displayMessage = `Sector "${SECTORS.find(s => s.id === selectedSector)?.name || selectedSector}" not found. Please try a different sector.`;
+      } else if (errorMessage.includes('Restaurant not found')) {
+        displayMessage = 'Restaurant not found. Please refresh the page.';
+      }
+      setError(displayMessage);
       setAvailability([]);
     } finally {
       setIsLoading(false);
@@ -74,7 +88,13 @@ export default function Home() {
   const loadReservations = async () => {
     try {
       const data = await reservationsApi.getByDay(RESTAURANT_ID, dateString, selectedSector);
-      setReservations(data.items);
+      // Sort reservations by start time to ensure consistent ordering
+      const sortedReservations = [...data.items].sort((a, b) => {
+        const timeA = new Date(a.start).getTime();
+        const timeB = new Date(b.start).getTime();
+        return timeA - timeB;
+      });
+      setReservations(sortedReservations);
     } catch (err: any) {
       console.error('Failed to load reservations:', err);
       setReservations([]);

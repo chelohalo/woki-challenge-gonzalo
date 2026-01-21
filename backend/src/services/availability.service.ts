@@ -1,4 +1,5 @@
 import { getRestaurantById } from '../repositories/restaurant.repository.js';
+import { getSectorById } from '../repositories/sector.repository.js';
 import { getTablesBySector } from '../repositories/table.repository.js';
 import { getReservationsByDay, getOverlappingReservations } from '../repositories/reservation.repository.js';
 import { generate15MinSlots, isWithinShift, addMinutesToDate, formatISODateTime } from '../utils/datetime.js';
@@ -24,18 +25,24 @@ export async function getAvailability(
     throw Errors.NOT_FOUND('Restaurant');
   }
 
-  // 2. Get all tables in sector
-  const tables = await getTablesBySector(sectorId);
-  if (tables.length === 0) {
+  // 2. Verify sector exists first
+  const sector = await getSectorById(sectorId);
+  if (!sector) {
     throw Errors.NOT_FOUND('Sector');
   }
 
-  // 3. Filter eligible tables
+  // 3. Get all tables in sector
+  const tables = await getTablesBySector(sectorId);
+  if (tables.length === 0) {
+    throw Errors.NOT_FOUND(`No tables found for sector ${sectorId}`);
+  }
+
+  // 4. Filter eligible tables
   const eligibleTables = tables.filter(
     (t) => t.minSize <= partySize && partySize <= t.maxSize
   );
 
-  // 4. Get ALL reservations for the day ONCE (optimization: single query)
+  // 5. Get ALL reservations for the day ONCE (optimization: single query)
   // Pass timezone so it can calculate day bounds correctly
   const allReservations = await getReservationsByDay(
     restaurantId,
@@ -44,14 +51,14 @@ export async function getAvailability(
     restaurant.timezone
   );
 
-  // 5. Calculate reservation duration for this party size
+  // 6. Calculate reservation duration for this party size
   const reservationDurationMinutes = calculateReservationDuration(
     partySize,
     restaurant.durationRules || undefined,
     restaurant.reservationDurationMinutes || 90
   );
 
-  // 6. Generate 15-minute slots for the day
+  // 7. Generate 15-minute slots for the day
   // Use max duration from rules to ensure all possible slots are generated
   const maxDuration = restaurant.durationRules && restaurant.durationRules.length > 0
     ? Math.max(...restaurant.durationRules.map(r => r.durationMinutes))
@@ -64,7 +71,7 @@ export async function getAvailability(
     maxDuration
   );
 
-  // 7. Process slots in memory (no additional DB queries)
+  // 8. Process slots in memory (no additional DB queries)
   const availability: AvailabilitySlot[] = [];
 
   for (const slotStart of slots) {

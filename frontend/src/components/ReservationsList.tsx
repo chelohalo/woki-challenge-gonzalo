@@ -35,10 +35,17 @@ export function ReservationsList({
     }
   };
 
+  // Sort reservations by start time, then filter by status
+  const sortedReservations = [...reservations].sort((a, b) => {
+    const timeA = new Date(a.start).getTime();
+    const timeB = new Date(b.start).getTime();
+    return timeA - timeB;
+  });
+
   const filteredReservations =
     statusFilter === 'ALL'
-      ? reservations
-      : reservations.filter((r) => r.status === statusFilter);
+      ? sortedReservations
+      : sortedReservations.filter((r) => r.status === statusFilter);
 
   if (isLoading) {
     return (
