@@ -1,10 +1,18 @@
 import { db } from './index.js';
-import { restaurants, sectors, tables } from './schema.js';
+import { restaurants, sectors, tables, reservations, idempotencyKeys } from './schema.js';
 
 const baseDate = '2025-09-08T00:00:00-03:00';
 
 async function seed() {
   console.log('🌱 Seeding database...');
+
+  // Clean up existing data (for idempotent seeding)
+  // Delete in order to respect foreign key constraints
+  await db.delete(idempotencyKeys);
+  await db.delete(reservations);
+  await db.delete(tables);
+  await db.delete(sectors);
+  await db.delete(restaurants);
 
   // Restaurant
   await db.insert(restaurants).values({
@@ -15,6 +23,7 @@ async function seed() {
       { start: '12:00', end: '16:00' },
       { start: '20:00', end: '23:45' },
     ],
+    reservationDurationMinutes: 90,
     createdAt: baseDate,
     updatedAt: baseDate,
   });
