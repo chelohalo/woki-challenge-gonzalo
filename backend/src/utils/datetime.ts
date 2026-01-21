@@ -72,14 +72,15 @@ export function getStartOfDay(date: Date, timezone: string): Date {
 export function generate15MinSlots(
   date: Date,
   timezone: string,
-  shifts?: Array<{ start: string; end: string }>
+  shifts?: Array<{ start: string; end: string }>,
+  reservationDurationMinutes: number = 90
 ): Date[] {
   // Start of the calendar day (UTC)
   const dayStartUTC = getZonedDayStartUTC(date, timezone);
 
-  // Full-day scheduling (00:00 → last slot that can fit 90 minutes)
+  // Full-day scheduling (00:00 → last slot that can fit reservation duration)
   if (!shifts || shifts.length === 0) {
-    const dayEndUTC = addMinutes(dayStartUTC, 24 * 60 - 90);
+    const dayEndUTC = addMinutes(dayStartUTC, 24 * 60 - reservationDurationMinutes);
     return eachMinuteOfInterval(
       { start: dayStartUTC, end: dayEndUTC },
       { step: 15 }
@@ -93,8 +94,8 @@ export function generate15MinSlots(
     const shiftStartUTC = localTimeToUTC(date, shift.start, timezone);
     const shiftEndUTC = localTimeToUTC(date, shift.end, timezone);
 
-    // Last slot start that can still fit a 90-minute reservation
-    const maxSlotStart = addMinutes(shiftEndUTC, -90);
+    // Last slot start that can still fit a reservation of the specified duration
+    const maxSlotStart = addMinutes(shiftEndUTC, -reservationDurationMinutes);
     const actualEnd =
       shiftStartUTC > maxSlotStart ? shiftStartUTC : maxSlotStart;
 

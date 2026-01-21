@@ -10,16 +10,14 @@ import {
 import { addMinutesToDate, formatISODateTime, isWithinShift } from '../utils/datetime.js';
 import { acquireLock } from '../utils/locks.js';
 import { Errors } from '../utils/errors.js';
-import type { Customer } from '../types/index.js';
-
-const RESERVATION_DURATION_MINUTES = 90;
+import type { CustomerInput } from '../types/index.js';
 
 export async function createReservationService(data: {
   restaurantId: string;
   sectorId: string;
   partySize: number;
   startDateTimeISO: string;
-  customer: Customer;
+  customer: CustomerInput;
   notes?: string;
 }) {
   // Acquire lock for this sector+slot to prevent concurrent bookings
@@ -43,17 +41,25 @@ export async function createReservationService(data: {
       throw Errors.OUTSIDE_SERVICE_WINDOW();
     }
 
-    // 3. Assign table (within lock to prevent race conditions)
-    const tableId = await assignTable(data.sectorId, data.startDateTimeISO, data.partySize);
+    // 3. Get reservation duration from restaurant (default to 90 if not set)
+    const reservationDurationMinutes = restaurant.reservationDurationMinutes || 90;
+
+    // 4. Assign table (within lock to prevent race conditions)
+    const tableId = await assignTable(
+      data.sectorId,
+      data.startDateTimeISO,
+      data.partySize,
+      reservationDurationMinutes
+    );
     if (!tableId) {
       throw Errors.NO_CAPACITY();
     }
 
-    // 4. Calculate end time
-    const endDate = addMinutesToDate(startDate, RESERVATION_DURATION_MINUTES);
+    // 5. Calculate end time
+    const endDate = addMinutesToDate(startDate, reservationDurationMinutes);
     const endDateTimeISO = formatISODateTime(endDate);
 
-    // 5. Create reservation
+    // 6. Create reservation
     const now = formatISODateTime(new Date());
     const reservationId = `RES_${nanoid(8).toUpperCase()}`;
 
@@ -78,7 +84,7 @@ export async function createReservationService(data: {
       throw new Error('Failed to create reservation');
     }
 
-    // 6. Format response
+    // 7. Format response
     return {
       id: reservation.id,
       restaurantId: reservation.restaurantId,

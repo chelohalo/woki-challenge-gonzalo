@@ -6,6 +6,7 @@ export const restaurants = sqliteTable('restaurants', {
   name: text('name').notNull(),
   timezone: text('timezone').notNull(),
   shifts: text('shifts', { mode: 'json' }).$type<Array<{ start: string; end: string }>>(),
+  reservationDurationMinutes: integer('reservation_duration_minutes').notNull().default(90),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 });

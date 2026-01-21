@@ -2,12 +2,11 @@ import { getEligibleTables } from '../repositories/table.repository.js';
 import { getOverlappingReservations } from '../repositories/reservation.repository.js';
 import { addMinutesToDate, formatISODateTime } from '../utils/datetime.js';
 
-const RESERVATION_DURATION_MINUTES = 90;
-
 export async function assignTable(
   sectorId: string,
   startDateTimeISO: string,
-  partySize: number
+  partySize: number,
+  reservationDurationMinutes: number = 90
 ): Promise<string | null> {
   // 1. Get eligible tables (minSize <= partySize <= maxSize)
   const eligibleTables = await getEligibleTables(sectorId, partySize);
@@ -18,7 +17,7 @@ export async function assignTable(
 
   // 2. Calculate end time
   const startDate = new Date(startDateTimeISO);
-  const endDate = addMinutesToDate(startDate, RESERVATION_DURATION_MINUTES);
+  const endDate = addMinutesToDate(startDate, reservationDurationMinutes);
   const endDateTimeISO = formatISODateTime(endDate);
 
   // 3. Sort by "best fit" - prefer tables with maxSize closest to partySize
