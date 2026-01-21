@@ -1,7 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import type { Reservation } from '../types';
+
+type ReservationStatus = 'ALL' | 'CONFIRMED' | 'PENDING' | 'CANCELLED';
 
 interface ReservationsListProps {
   reservations: Reservation[];
@@ -20,6 +23,8 @@ export function ReservationsList({
   onReject,
   isLoading,
 }: ReservationsListProps) {
+  const [statusFilter, setStatusFilter] = useState<ReservationStatus>('ALL');
+
   const formatDateTime = (isoString: string) => {
     try {
       const date = parseISO(isoString);
@@ -30,6 +35,11 @@ export function ReservationsList({
     }
   };
 
+  const filteredReservations =
+    statusFilter === 'ALL'
+      ? reservations
+      : reservations.filter((r) => r.status === statusFilter);
+
   if (isLoading) {
     return (
       <div className="text-center py-8 text-gray-500 dark:text-gray-400">
@@ -38,16 +48,35 @@ export function ReservationsList({
     );
   }
 
-  if (reservations.length === 0) {
-    return (
-      <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-        <p>No reservations for this date.</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-3">
+    <div>
+      {/* Status Filter */}
+      <div className="mb-4 flex gap-2 flex-wrap">
+        {(['ALL', 'CONFIRMED', 'PENDING', 'CANCELLED'] as ReservationStatus[]).map((status) => (
+          <button
+            key={status}
+            onClick={() => setStatusFilter(status)}
+            className={`px-3 py-1 text-sm rounded-md transition-colors ${
+              statusFilter === status
+                ? 'bg-blue-600 dark:bg-blue-500 text-white'
+                : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+            }`}
+          >
+            {status}
+          </button>
+        ))}
+      </div>
+
+      {filteredReservations.length === 0 ? (
+        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+          <p>
+            {reservations.length === 0
+              ? 'No reservations for this date.'
+              : `No ${statusFilter === 'ALL' ? '' : statusFilter.toLowerCase()} reservations.`}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
       {reservations.map((reservation) => (
         <div
           key={reservation.id}
@@ -143,6 +172,8 @@ export function ReservationsList({
           </div>
         </div>
       ))}
+        </div>
+      )}
     </div>
   );
 }

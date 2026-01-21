@@ -325,10 +325,52 @@ Returns the updated reservation (same format as POST response).
 - [x] Dark mode support
 - [x] Responsive design
 - [x] Public deployment (Railway + Vercel)
+- [x] **BONUS 4**: Large-group approval flow (reservations ≥8 guests require approval)
 - [x] **BONUS 5**: Table combinations within a sector (assign multiple tables when no single table fits)
 - [x] **BONUS 6**: Advance booking policy (min/max advance time)
 - [x] **BONUS 7**: Variable duration by party size (≤2→75min, ≤4→90min, ≤8→120min, >8→150min)
 - [x] **BONUS 9**: Edit reservation (PATCH endpoint with re-validation and re-assignment)
+
+### Large-Group Approval Flow (BONUS 4)
+
+For party sizes equal to or greater than the restaurant's `largeGroupThreshold` (default: 8), reservations are created with `PENDING` status and require manual approval.
+
+**Workflow:**
+1. Customer creates a reservation for 8+ guests
+2. System creates a `PENDING` reservation with an `expiresAt` timestamp (TTL: `pendingHoldTTLMinutes`, default: 30 minutes)
+3. Restaurant staff can:
+   - **Approve**: Changes status to `CONFIRMED` and removes expiration
+   - **Reject**: Changes status to `CANCELLED`
+4. If not approved/rejected within TTL, the reservation automatically expires (status → `CANCELLED`)
+
+**API Endpoints:**
+- `POST /reservations/:id/approve` - Approve a pending reservation
+- `POST /reservations/:id/reject` - Reject a pending reservation
+- `POST /reservations/expire-pending` - Manually expire pending holds (also runs automatically before new reservations)
+
+**Configuration:**
+- `largeGroupThreshold`: Party size that triggers approval flow (default: 8)
+- `pendingHoldTTLMinutes`: Time-to-live for pending holds in minutes (default: 30)
+
+**Example:**
+```json
+POST /reservations
+{
+  "restaurantId": "R1",
+  "sectorId": "S1",
+  "partySize": 10,
+  "startDateTimeISO": "2026-01-25T20:00:00-03:00",
+  "customer": { ... }
+}
+
+Response:
+{
+  "id": "RES_XYZ67890",
+  "status": "PENDING",
+  "expiresAt": "2026-01-25T20:30:00-03:00",
+  ...
+}
+```
 
 ## 🚀 Deployment
 

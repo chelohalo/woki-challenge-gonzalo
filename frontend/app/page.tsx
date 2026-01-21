@@ -9,6 +9,8 @@ import { ReservationsList } from '../src/components/ReservationsList';
 import { ThemeToggle } from '../src/components/ThemeToggle';
 import { Login } from '../src/components/Login';
 import { Spinner } from '../src/components/Spinner';
+import { Toast, useToast } from '../src/components/Toast';
+import { ConfirmDialog } from '../src/components/ConfirmDialog';
 import { useApiLoading } from '../src/hooks/useApiLoading';
 import { availabilityApi, reservationsApi } from '../src/lib/api';
 import type { AvailabilitySlot, Reservation } from '../src/types';
@@ -34,7 +36,15 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [durationMinutes, setDurationMinutes] = useState<number>(90);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    variant?: 'danger' | 'warning';
+  } | null>(null);
   const isApiLoading = useApiLoading();
+  const { toast, showToast, hideToast } = useToast();
 
   // Check authentication on mount
   useEffect(() => {
@@ -82,11 +92,13 @@ export default function Home() {
   const handleLogin = (token: string) => {
     localStorage.setItem(AUTH_TOKEN_KEY, token);
     setIsAuthenticated(true);
+    showToast('Successfully logged in', 'success');
   };
 
   const handleLogout = () => {
     localStorage.removeItem(AUTH_TOKEN_KEY);
     setIsAuthenticated(false);
+    showToast('Logged out successfully', 'info');
   };
 
   const handleSlotClick = (slot: AvailabilitySlot) => {
@@ -97,22 +109,29 @@ export default function Home() {
 
   const handleReservationSuccess = () => {
     setSelectedSlot(null);
+    showToast('Reservation created successfully!', 'success');
     loadAvailability();
     loadReservations();
   };
 
   const handleCancelReservation = async (id: string) => {
-    if (!confirm('Are you sure you want to cancel this reservation?')) {
-      return;
-    }
-
-    try {
-      await reservationsApi.cancel(id);
-      loadAvailability();
-      loadReservations();
-    } catch (err: any) {
-      alert(err.message || 'Failed to cancel reservation');
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Cancel Reservation',
+      message: 'Are you sure you want to cancel this reservation? This action cannot be undone.',
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        try {
+          await reservationsApi.cancel(id);
+          showToast('Reservation cancelled successfully', 'success');
+          loadAvailability();
+          loadReservations();
+        } catch (err: any) {
+          showToast(err.message || 'Failed to cancel reservation', 'error');
+        }
+      },
+      variant: 'danger',
+    });
   };
 
   const handleEditReservation = (reservation: Reservation) => {
@@ -121,32 +140,49 @@ export default function Home() {
 
   const handleEditSuccess = () => {
     setEditingReservation(null);
+    showToast('Reservation updated successfully!', 'success');
     loadAvailability();
     loadReservations();
   };
 
   const handleApproveReservation = async (id: string) => {
-    try {
-      await reservationsApi.approve(id);
-      loadAvailability();
-      loadReservations();
-    } catch (err: any) {
-      alert(err.message || 'Failed to approve reservation');
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Approve Reservation',
+      message: 'Are you sure you want to approve this large group reservation?',
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        try {
+          await reservationsApi.approve(id);
+          showToast('Reservation approved successfully', 'success');
+          loadAvailability();
+          loadReservations();
+        } catch (err: any) {
+          showToast(err.message || 'Failed to approve reservation', 'error');
+        }
+      },
+      variant: 'warning',
+    });
   };
 
   const handleRejectReservation = async (id: string) => {
-    if (!confirm('Are you sure you want to reject this reservation?')) {
-      return;
-    }
-
-    try {
-      await reservationsApi.reject(id);
-      loadAvailability();
-      loadReservations();
-    } catch (err: any) {
-      alert(err.message || 'Failed to reject reservation');
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Reject Reservation',
+      message: 'Are you sure you want to reject this reservation? This action cannot be undone.',
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        try {
+          await reservationsApi.reject(id);
+          showToast('Reservation rejected successfully', 'info');
+          loadAvailability();
+          loadReservations();
+        } catch (err: any) {
+          showToast(err.message || 'Failed to reject reservation', 'error');
+        }
+      },
+      variant: 'danger',
+    });
   };
 
   const changeDate = (days: number) => {
@@ -161,6 +197,17 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
       {isApiLoading && <Spinner />}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
+      {confirmDialog && (
+        <ConfirmDialog
+          isOpen={confirmDialog.isOpen}
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={() => setConfirmDialog(null)}
+          variant={confirmDialog.variant}
+        />
+      )}
       <ThemeToggle />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
