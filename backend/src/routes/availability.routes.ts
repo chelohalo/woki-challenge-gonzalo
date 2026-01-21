@@ -3,13 +3,13 @@ import { getAvailability } from '../services/availability.service.js';
 import { getRestaurantById } from '../repositories/restaurant.repository.js';
 import { calculateReservationDuration } from '../utils/duration.js';
 import { availabilityQuerySchema } from '../schemas/reservation.schema.js';
-import { Errors } from '../utils/errors.js';
+import { Errors, AppError } from '../utils/errors.js';
 import { Metrics } from '../utils/metrics.js';
 
 export async function availabilityRoutes(fastify: FastifyInstance) {
   fastify.get('/availability', async (request, reply) => {
     const startTime = Date.now();
-    const requestId = (request as any).requestId || 'unknown';
+    const requestId = request.requestId || 'unknown';
     
     try {
       const query = availabilityQuerySchema.parse(request.query);
@@ -64,20 +64,21 @@ export async function availabilityRoutes(fastify: FastifyInstance) {
         durationMinutes: reservationDurationMinutes,
         slots,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       const duration = Date.now() - startTime;
       Metrics.increment('errors');
       
+      const errorMessage = error instanceof Error ? error.message : String(error);
       request.log.error({
         requestId,
-        error: error.message,
+        error: errorMessage,
         durationMs: duration,
       }, 'Availability query failed');
 
-      if (error.name === 'ZodError') {
+      if (error instanceof Error && error.name === 'ZodError') {
         throw Errors.INVALID_FORMAT(error.message);
       }
-      if (error instanceof Error && 'statusCode' in error) {
+      if (error instanceof AppError) {
         throw error;
       }
       throw new Error('Internal server error');

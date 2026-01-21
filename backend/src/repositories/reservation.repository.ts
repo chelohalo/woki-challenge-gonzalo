@@ -140,7 +140,7 @@ export async function updateReservation(
     updatedAt: string;
   }
 ) {
-  const updateData: any = { updatedAt: data.updatedAt };
+  const updateData: Record<string, unknown> = { updatedAt: data.updatedAt };
   
   if (data.sectorId !== undefined) updateData.sectorId = data.sectorId;
   if (data.tableIds !== undefined) updateData.tableIds = data.tableIds;

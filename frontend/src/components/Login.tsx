@@ -34,8 +34,9 @@ export function Login({ onLogin }: LoginProps) {
 
       const data = await response.json();
       onLogin(data.token);
-    } catch (err: any) {
-      setError(err.message || 'Login failed. Please try again.');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Login failed. Please try again.';
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }

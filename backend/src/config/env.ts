@@ -10,6 +10,9 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(3001),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   FRONTEND_URL: z.string().url().optional(),
+  // Authentication credentials (for demo - in production use proper auth)
+  AUTH_USERNAME: z.string().default('user123'),
+  AUTH_PASSWORD: z.string().default('pass123'),
 });
 
 export const env = envSchema.parse(process.env);

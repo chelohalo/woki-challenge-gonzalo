@@ -17,7 +17,7 @@ import {
 } from '../schemas/reservation.schema.js';
 import { getIdempotencyResponse, storeIdempotencyResponse } from '../repositories/idempotency.repository.js';
 import { formatISODateTime } from '../utils/datetime.js';
-import { Errors } from '../utils/errors.js';
+import { Errors, AppError } from '../utils/errors.js';
 import { Metrics } from '../utils/metrics.js';
 
 const IDEMPOTENCY_KEY_HEADER = 'idempotency-key';
@@ -25,7 +25,7 @@ const IDEMPOTENCY_KEY_HEADER = 'idempotency-key';
 export async function reservationsRoutes(fastify: FastifyInstance) {
   fastify.post('/reservations', async (request, reply) => {
     const startTime = Date.now();
-    const requestId = (request as any).requestId || 'unknown';
+    const requestId = request.requestId || 'unknown';
     
     try {
       // Check idempotency
@@ -87,11 +87,11 @@ export async function reservationsRoutes(fastify: FastifyInstance) {
       }, 'Reservation created');
 
       reply.status(201).send(reservation);
-    } catch (error: any) {
+    } catch (error: unknown) {
       const duration = Date.now() - startTime;
       
-      if (error instanceof Error && 'statusCode' in error) {
-        const appError = error as any;
+      if (error instanceof AppError) {
+        const appError = error;
         
         // Track conflicts (409 errors)
         if (appError.statusCode === 409) {
@@ -114,15 +114,16 @@ export async function reservationsRoutes(fastify: FastifyInstance) {
       }
 
       Metrics.increment('errors');
+      const errorMessage = error instanceof Error ? error.message : String(error);
       request.log.error({
         requestId,
-        error: error.message || String(error),
+        error: errorMessage,
         durationMs: duration,
         operation: 'create_reservation',
         outcome: 'error',
       }, 'Unexpected error creating reservation');
 
-      if (error.name === 'ZodError') {
+      if (error instanceof Error && error.name === 'ZodError') {
         throw Errors.INVALID_FORMAT(error.message);
       }
       throw new Error('Internal server error');
@@ -131,7 +132,7 @@ export async function reservationsRoutes(fastify: FastifyInstance) {
 
   fastify.delete('/reservations/:id', async (request, reply) => {
     const startTime = Date.now();
-    const requestId = (request as any).requestId || 'unknown';
+    const requestId = request.requestId || 'unknown';
     const { id } = request.params as { id: string };
     
     try {
@@ -155,20 +156,21 @@ export async function reservationsRoutes(fastify: FastifyInstance) {
       }, 'Reservation cancelled');
 
       reply.status(204).send();
-    } catch (error: any) {
+    } catch (error: unknown) {
       const duration = Date.now() - startTime;
       Metrics.increment('errors');
 
+      const errorMessage = error instanceof Error ? error.message : String(error);
       request.log.error({
         requestId,
         reservationId: id,
-        error: error.message || String(error),
+        error: errorMessage,
         durationMs: duration,
         operation: 'cancel_reservation',
         outcome: 'error',
       }, 'Failed to cancel reservation');
 
-      if (error instanceof Error && 'statusCode' in error) {
+      if (error instanceof AppError) {
         throw error;
       }
       throw new Error('Internal server error');
@@ -190,21 +192,22 @@ export async function reservationsRoutes(fastify: FastifyInstance) {
         date: query.date,
         items,
       };
-    } catch (error: any) {
-      if (error.name === 'ZodError') {
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name === 'ZodError') {
         throw Errors.INVALID_FORMAT(error.message);
       }
-      if (error instanceof Error && 'statusCode' in error) {
+      if (error instanceof AppError) {
         throw error;
       }
-      fastify.log.error(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      fastify.log.error({ error: errorMessage }, 'Failed to get reservations by day');
       throw new Error('Internal server error');
     }
   });
 
   fastify.patch('/reservations/:id', async (request, reply) => {
     const startTime = Date.now();
-    const requestId = (request as any).requestId || 'unknown';
+    const requestId = request.requestId || 'unknown';
     const { id } = request.params as { id: string };
     
     try {
@@ -268,11 +271,11 @@ export async function reservationsRoutes(fastify: FastifyInstance) {
       }, 'Reservation updated');
 
       reply.status(200).send(reservation);
-    } catch (error: any) {
+    } catch (error: unknown) {
       const duration = Date.now() - startTime;
       
-      if (error instanceof Error && 'statusCode' in error) {
-        const appError = error as any;
+      if (error instanceof AppError) {
+        const appError = error;
         
         // Track conflicts (409 errors)
         if (appError.statusCode === 409) {
@@ -296,16 +299,17 @@ export async function reservationsRoutes(fastify: FastifyInstance) {
       }
 
       Metrics.increment('errors');
+      const errorMessage = error instanceof Error ? error.message : String(error);
       request.log.error({
         requestId,
         reservationId: id,
-        error: error.message || String(error),
+        error: errorMessage,
         durationMs: duration,
         operation: 'update_reservation',
         outcome: 'error',
       }, 'Unexpected error updating reservation');
 
-      if (error.name === 'ZodError') {
+      if (error instanceof Error && error.name === 'ZodError') {
         throw Errors.INVALID_FORMAT(error.message);
       }
       throw new Error('Internal server error');
@@ -314,7 +318,7 @@ export async function reservationsRoutes(fastify: FastifyInstance) {
 
   fastify.post('/reservations/:id/approve', async (request, reply) => {
     const startTime = Date.now();
-    const requestId = (request as any).requestId || 'unknown';
+    const requestId = request.requestId || 'unknown';
     const { id } = request.params as { id: string };
     
     try {
@@ -339,18 +343,19 @@ export async function reservationsRoutes(fastify: FastifyInstance) {
         message: 'Reservation approved',
         reservationId: id,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const duration = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : String(error);
       request.log.error({
         requestId,
         reservationId: id,
-        error: error.message || String(error),
+        error: errorMessage,
         durationMs: duration,
         operation: 'approve_reservation',
         outcome: 'error',
       }, 'Failed to approve reservation');
 
-      if (error instanceof Error && 'statusCode' in error) {
+      if (error instanceof AppError) {
         throw error;
       }
       throw new Error('Internal server error');
@@ -359,7 +364,7 @@ export async function reservationsRoutes(fastify: FastifyInstance) {
 
   fastify.post('/reservations/:id/reject', async (request, reply) => {
     const startTime = Date.now();
-    const requestId = (request as any).requestId || 'unknown';
+    const requestId = request.requestId || 'unknown';
     const { id } = request.params as { id: string };
     
     try {
@@ -384,18 +389,19 @@ export async function reservationsRoutes(fastify: FastifyInstance) {
         message: 'Reservation rejected',
         reservationId: id,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const duration = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : String(error);
       request.log.error({
         requestId,
         reservationId: id,
-        error: error.message || String(error),
+        error: errorMessage,
         durationMs: duration,
         operation: 'reject_reservation',
         outcome: 'error',
       }, 'Failed to reject reservation');
 
-      if (error instanceof Error && 'statusCode' in error) {
+      if (error instanceof AppError) {
         throw error;
       }
       throw new Error('Internal server error');
@@ -405,7 +411,7 @@ export async function reservationsRoutes(fastify: FastifyInstance) {
   // Endpoint to manually trigger expiration check (useful for testing/admin)
   fastify.post('/reservations/expire-pending', async (request, reply) => {
     const startTime = Date.now();
-    const requestId = (request as any).requestId || 'unknown';
+    const requestId = request.requestId || 'unknown';
     
     try {
       request.log.info({
@@ -428,17 +434,18 @@ export async function reservationsRoutes(fastify: FastifyInstance) {
         message: 'Expiration check completed',
         expiredCount,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const duration = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : String(error);
       request.log.error({
         requestId,
-        error: error.message || String(error),
+        error: errorMessage,
         durationMs: duration,
         operation: 'expire_pending_holds',
         outcome: 'error',
       }, 'Failed to expire pending holds');
 
-      if (error instanceof Error && 'statusCode' in error) {
+      if (error instanceof AppError) {
         throw error;
       }
       throw new Error('Internal server error');

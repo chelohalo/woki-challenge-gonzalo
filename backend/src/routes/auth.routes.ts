@@ -1,9 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { Errors } from '../utils/errors.js';
-
-// Hardcoded credentials
-const VALID_USERNAME = 'user123';
-const VALID_PASSWORD = 'pass123';
+import { env } from '../config/env.js';
 
 export async function authRoutes(fastify: FastifyInstance) {
   fastify.post('/auth/login', async (request, reply) => {
@@ -14,25 +11,25 @@ export async function authRoutes(fastify: FastifyInstance) {
         throw Errors.INVALID_FORMAT('Username and password are required');
       }
 
-      if (body.username === VALID_USERNAME && body.password === VALID_PASSWORD) {
+      if (body.username === env.AUTH_USERNAME && body.password === env.AUTH_PASSWORD) {
         // Simple token (in production, use JWT or similar)
-        const token = Buffer.from(`${VALID_USERNAME}:${Date.now()}`).toString('base64');
+        const token = Buffer.from(`${env.AUTH_USERNAME}:${Date.now()}`).toString('base64');
         
         return reply.status(200).send({
           success: true,
           token,
           user: {
-            username: VALID_USERNAME,
+            username: env.AUTH_USERNAME,
           },
         });
       } else {
         throw Errors.UNAUTHORIZED('Invalid username or password');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof Error && 'statusCode' in error) {
         throw error;
       }
-      fastify.log.error(error);
+      fastify.log.error({ error }, 'Login failed');
       throw Errors.UNAUTHORIZED('Login failed');
     }
   });

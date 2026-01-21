@@ -9,6 +9,46 @@ import { Errors } from './errors.js';
 // Map of mutexes per sector+slot combination
 const mutexes = new Map<string, Mutex>();
 
+// Track last access time for cleanup
+const lastAccess = new Map<string, number>();
+
+// Cleanup interval: remove unused mutexes older than 1 hour
+const CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+const MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
+
+// Start cleanup interval
+let cleanupInterval: NodeJS.Timeout | null = null;
+
+function startCleanupInterval() {
+  if (cleanupInterval) return; // Already started
+
+  cleanupInterval = setInterval(() => {
+    const now = Date.now();
+    const keysToDelete: string[] = [];
+
+    for (const [key, lastUsed] of lastAccess.entries()) {
+      if (now - lastUsed > MAX_AGE_MS) {
+        const mutex = mutexes.get(key);
+        // Only delete if mutex is not locked and not in use
+        if (mutex && !mutex.isLocked()) {
+          keysToDelete.push(key);
+        }
+      }
+    }
+
+    // Delete unused mutexes
+    for (const key of keysToDelete) {
+      mutexes.delete(key);
+      lastAccess.delete(key);
+    }
+
+    if (keysToDelete.length > 0) {
+      // Log cleanup for observability (optional, can be removed if too verbose)
+      // console.log(`Cleaned up ${keysToDelete.length} unused locks`);
+    }
+  }, CLEANUP_INTERVAL_MS);
+}
+
 /**
  * Generate lock key from sector and slot
  */
@@ -26,7 +66,10 @@ export async function acquireLock(
   startDateTimeISO: string
 ): Promise<() => void> {
   const key = getLockKey(sectorId, startDateTimeISO);
-  
+
+  // Start cleanup interval on first use
+  startCleanupInterval();
+
   // Get or create mutex for this key
   let mutex = mutexes.get(key);
   if (!mutex) {
@@ -42,10 +85,26 @@ export async function acquireLock(
   // Acquire lock
   const release = await mutex.acquire();
 
+  // Update last access time
+  lastAccess.set(key, Date.now());
+
   // Return release function
   return () => {
     release();
-    // Clean up mutex if no one is waiting (optional optimization)
-    // For now, we keep them to avoid recreation overhead
+    // Update last access time when released
+    lastAccess.set(key, Date.now());
+  };
+}
+
+/**
+ * Get current lock statistics (useful for debugging/monitoring)
+ */
+export function getLockStats() {
+  return {
+    totalLocks: mutexes.size,
+    lockedCount: Array.from(mutexes.values()).filter(m => m.isLocked()).length,
+    oldestLock: lastAccess.size > 0
+      ? Math.min(...Array.from(lastAccess.values()))
+      : null,
   };
 }

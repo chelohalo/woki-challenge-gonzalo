@@ -103,10 +103,39 @@ export default function Home() {
 
   // Execute useEffect always, but only load data if authenticated
   useEffect(() => {
-    if (isAuthenticated) {
-      loadAvailability();
-      loadReservations();
+    if (!isAuthenticated) {
+      return;
     }
+
+    let isCancelled = false;
+
+    const loadData = async () => {
+      try {
+        await Promise.all([
+          loadAvailability().catch((err) => {
+            if (!isCancelled) {
+              console.error('Failed to load availability:', err);
+            }
+          }),
+          loadReservations().catch((err) => {
+            if (!isCancelled) {
+              console.error('Failed to load reservations:', err);
+            }
+          }),
+        ]);
+      } catch (err) {
+        if (!isCancelled) {
+          console.error('Error loading data:', err);
+        }
+      }
+    };
+
+    loadData();
+
+    // Cleanup function to prevent state updates if component unmounts
+    return () => {
+      isCancelled = true;
+    };
   }, [selectedDate, selectedSector, partySize, isAuthenticated]);
 
   const handleLogin = (token: string) => {
@@ -146,8 +175,9 @@ export default function Home() {
           showToast('Reservation cancelled successfully', 'success');
           loadAvailability();
           loadReservations();
-        } catch (err: any) {
-          showToast(err.message || 'Failed to cancel reservation', 'error');
+        } catch (err: unknown) {
+          const errorMessage = err instanceof Error ? err.message : 'Failed to cancel reservation';
+          showToast(errorMessage, 'error');
         }
       },
       variant: 'danger',
@@ -177,8 +207,9 @@ export default function Home() {
           showToast('Reservation approved successfully', 'success');
           loadAvailability();
           loadReservations();
-        } catch (err: any) {
-          showToast(err.message || 'Failed to approve reservation', 'error');
+        } catch (err: unknown) {
+          const errorMessage = err instanceof Error ? err.message : 'Failed to approve reservation';
+          showToast(errorMessage, 'error');
         }
       },
       variant: 'warning',
@@ -197,8 +228,9 @@ export default function Home() {
           showToast('Reservation rejected successfully', 'info');
           loadAvailability();
           loadReservations();
-        } catch (err: any) {
-          showToast(err.message || 'Failed to reject reservation', 'error');
+        } catch (err: unknown) {
+          const errorMessage = err instanceof Error ? err.message : 'Failed to reject reservation';
+          showToast(errorMessage, 'error');
         }
       },
       variant: 'danger',

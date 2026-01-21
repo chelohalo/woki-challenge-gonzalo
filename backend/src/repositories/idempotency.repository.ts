@@ -14,7 +14,7 @@ export async function getIdempotencyResponse(key: string) {
 export async function storeIdempotencyResponse(key: string, response: unknown, createdAt: string) {
   await db.insert(idempotencyKeys).values({
     key,
-    response: response as any,
+    response: response as Record<string, unknown>,
     createdAt,
   });
 }

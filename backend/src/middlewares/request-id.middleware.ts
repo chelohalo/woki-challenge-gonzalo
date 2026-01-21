@@ -17,7 +17,7 @@ export async function requestIdMiddleware(
     `req_${nanoid(8).toUpperCase()}`;
 
   // Add to request object for use in handlers
-  (request as any).requestId = requestId;
+  request.requestId = requestId;
 
   // Echo back in response header
   reply.header(REQUEST_ID_HEADER, requestId);

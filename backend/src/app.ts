@@ -1,17 +1,18 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import type { FastifyRequest, FastifyReply } from 'fastify';
 import { env } from './config/env.js';
 import { availabilityRoutes } from './routes/availability.routes.js';
 import { reservationsRoutes } from './routes/reservations.routes.js';
 import { authRoutes } from './routes/auth.routes.js';
-import { Errors } from './utils/errors.js';
+import { Errors, AppError } from './utils/errors.js';
 import { requestIdMiddleware } from './middlewares/request-id.middleware.js';
 
 // Configure structured logging
-const loggerConfig: any = {
+const loggerConfig: Record<string, unknown> = {
   level: env.NODE_ENV === 'production' ? 'info' : 'debug',
   serializers: {
-    req: (req: any) => ({
+    req: (req: FastifyRequest) => ({
       method: req.method,
       url: req.url,
       headers: {
@@ -19,13 +20,13 @@ const loggerConfig: any = {
         'content-type': req.headers['content-type'],
       },
     }),
-    res: (res: any) => ({
+    res: (res: FastifyReply) => ({
       statusCode: res.statusCode,
     }),
-    err: (err: any) => ({
+    err: (err: Error) => ({
       type: err.constructor.name,
       message: err.message,
-      stack: env.NODE_ENV === 'development' ? err.stack : undefined,
+      stack: env.NODE_ENV === 'development' ? (err.stack || '') : '',
     }),
   },
 };
@@ -59,25 +60,24 @@ app.addHook('onRequest', requestIdMiddleware);
 
 // Error handler with structured logging
 app.setErrorHandler((error, request, reply) => {
-  const requestId = (request as any).requestId || 'unknown';
+  const requestId = request.requestId || 'unknown';
   
-  if (error instanceof Error && 'statusCode' in error) {
-    const appError = error as any;
-    const statusCode = appError.statusCode || 500;
+  if (error instanceof AppError) {
+    const statusCode = error.statusCode || 500;
     
     // Log with context
     request.log.warn({
       requestId,
-      error: appError.code,
+      error: error.code,
       statusCode,
-      detail: appError.detail || appError.message,
+      detail: error.detail || error.message,
       path: request.url,
       method: request.method,
     }, 'Request error');
     
     reply.status(statusCode).send({
-      error: appError.code,
-      detail: appError.detail || appError.message,
+      error: error.code,
+      detail: error.detail || error.message,
       requestId, // Include requestId in error response
     });
   } else {

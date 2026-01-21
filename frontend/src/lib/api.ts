@@ -1,17 +1,106 @@
 import { startLoading, stopLoading } from '../hooks/useApiLoading';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const REQUEST_TIMEOUT_MS = 30000; // 30 seconds
+
+interface ApiError extends Error {
+  status?: number;
+  code?: string;
+  detail?: string;
+}
+
+class NetworkError extends Error {
+  constructor(message: string, public originalError?: unknown) {
+    super(message);
+    this.name = 'NetworkError';
+  }
+}
+
+class TimeoutError extends Error {
+  constructor() {
+    super('Request timeout - the server took too long to respond');
+    this.name = 'TimeoutError';
+  }
+}
+
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new TimeoutError();
+    }
+    throw error;
+  }
+}
+
+async function handleResponse<T>(response: Response): Promise<T> {
+  if (!response.ok) {
+    let errorDetail: string;
+    let errorCode: string | undefined;
+    
+    try {
+      const errorData = await response.json() as { error?: string; detail?: string; code?: string };
+      errorDetail = errorData.detail || errorData.error || response.statusText;
+      errorCode = errorData.code || errorData.error;
+    } catch {
+      // If response is not JSON, try to get text
+      try {
+        errorDetail = await response.text() || response.statusText;
+      } catch {
+        errorDetail = response.statusText || 'Unknown error';
+      }
+    }
+
+    const apiError: ApiError = new Error(`API Error: ${errorDetail}`);
+    apiError.status = response.status;
+    apiError.code = errorCode;
+    apiError.detail = errorDetail;
+    throw apiError;
+  }
+
+  try {
+    return await response.json();
+  } catch (error) {
+    throw new Error('Invalid JSON response from server');
+  }
+}
 
 export const api = {
   async get<T>(path: string): Promise<T> {
     startLoading();
     try {
-      const response = await fetch(`${API_URL}${path}`);
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API Error: ${response.statusText} - ${errorText}`);
+      const response = await fetchWithTimeout(
+        `${API_URL}${path}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        },
+        REQUEST_TIMEOUT_MS
+      );
+      return handleResponse<T>(response);
+    } catch (error) {
+      if (error instanceof TimeoutError) {
+        throw error;
       }
-      return response.json();
+      if (error instanceof Error && error.name === 'NetworkError') {
+        throw new NetworkError('Network error - please check your connection', error);
+      }
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        throw new NetworkError('Failed to connect to server - please check if the server is running', error);
+      }
+      throw error;
     } finally {
       stopLoading();
     }
@@ -28,17 +117,28 @@ export const api = {
         headers['idempotency-key'] = idempotencyKey;
       }
 
-      const response = await fetch(`${API_URL}${path}`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body),
-      });
+      const response = await fetchWithTimeout(
+        `${API_URL}${path}`,
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(body),
+        },
+        REQUEST_TIMEOUT_MS
+      );
       
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API Error: ${response.statusText} - ${errorText}`);
+      return handleResponse<T>(response);
+    } catch (error) {
+      if (error instanceof TimeoutError) {
+        throw error;
       }
-      return response.json();
+      if (error instanceof Error && error.name === 'NetworkError') {
+        throw new NetworkError('Network error - please check your connection', error);
+      }
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        throw new NetworkError('Failed to connect to server - please check if the server is running', error);
+      }
+      throw error;
     } finally {
       stopLoading();
     }
@@ -47,13 +147,28 @@ export const api = {
   async delete(path: string): Promise<void> {
     startLoading();
     try {
-      const response = await fetch(`${API_URL}${path}`, {
-        method: 'DELETE',
-      });
+      const response = await fetchWithTimeout(
+        `${API_URL}${path}`,
+        {
+          method: 'DELETE',
+        },
+        REQUEST_TIMEOUT_MS
+      );
+      
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API Error: ${response.statusText} - ${errorText}`);
+        await handleResponse<never>(response);
       }
+    } catch (error) {
+      if (error instanceof TimeoutError) {
+        throw error;
+      }
+      if (error instanceof Error && error.name === 'NetworkError') {
+        throw new NetworkError('Network error - please check your connection', error);
+      }
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        throw new NetworkError('Failed to connect to server - please check if the server is running', error);
+      }
+      throw error;
     } finally {
       stopLoading();
     }
@@ -70,17 +185,28 @@ export const api = {
         headers['idempotency-key'] = idempotencyKey;
       }
 
-      const response = await fetch(`${API_URL}${path}`, {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify(body),
-      });
+      const response = await fetchWithTimeout(
+        `${API_URL}${path}`,
+        {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify(body),
+        },
+        REQUEST_TIMEOUT_MS
+      );
       
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API Error: ${response.statusText} - ${errorText}`);
+      return handleResponse<T>(response);
+    } catch (error) {
+      if (error instanceof TimeoutError) {
+        throw error;
       }
-      return response.json();
+      if (error instanceof Error && error.name === 'NetworkError') {
+        throw new NetworkError('Network error - please check your connection', error);
+      }
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        throw new NetworkError('Failed to connect to server - please check if the server is running', error);
+      }
+      throw error;
     } finally {
       stopLoading();
     }

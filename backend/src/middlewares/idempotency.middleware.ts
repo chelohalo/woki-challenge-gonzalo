@@ -26,7 +26,7 @@ export async function idempotencyMiddleware(
   const originalSend = reply.send.bind(reply);
   
   // Override send to cache successful responses
-  reply.send = function (payload: any) {
+  reply.send = function (payload: unknown) {
     if (reply.statusCode >= 200 && reply.statusCode < 300) {
       // Cache successful response
       const now = formatISODateTime(new Date());
