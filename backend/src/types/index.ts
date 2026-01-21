@@ -27,10 +27,13 @@ export interface Table {
   updatedAt: ISODateTime;
 }
 
-export interface Customer {
+export interface CustomerInput {
   name: string;
   phone: string;
   email: string;
+}
+
+export interface Customer extends CustomerInput {
   createdAt: ISODateTime;
   updatedAt: ISODateTime;
 }
