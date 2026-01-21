@@ -42,7 +42,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"status\": \"ok\",\n  \"timestamp\": \"2025-01-21T19:50:21-03:00\",\n  \"requestId\": \"req-abcdef1234\"\n}"
+              "body": "{\n  \"status\": \"ok\",\n  \"timestamp\": \"2026-01-21T19:50:21-03:00\",\n  \"requestId\": \"req-abcdef1234\"\n}"
             }
           ]
         },
@@ -79,7 +79,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"timestamp\": \"2025-01-21T19:50:21-03:00\",\n  \"metrics\": {\n    \"reservationsCreated\": 42,\n    \"reservationsCancelled\": 5,\n    \"reservationsUpdated\": 3,\n    \"conflicts\": 2,\n    \"idempotentHits\": 8,\n    \"availabilityQueries\": 156,\n    \"errors\": 1,\n    \"summary\": {\n      \"total\": 50,\n      \"created\": 42,\n      \"cancelled\": 5,\n      \"updated\": 3,\n      \"conflictRate\": 4.0,\n      \"idempotencyHitRate\": 19.05\n    }\n  },\n  \"requestId\": \"req-abcdef1234\"\n}"
+              "body": "{\n  \"timestamp\": \"2026-01-21T19:50:21-03:00\",\n  \"metrics\": {\n    \"reservationsCreated\": 42,\n    \"reservationsCancelled\": 5,\n    \"reservationsUpdated\": 3,\n    \"conflicts\": 2,\n    \"idempotentHits\": 8,\n    \"availabilityQueries\": 156,\n    \"errors\": 1,\n    \"summary\": {\n      \"total\": 50,\n      \"created\": 42,\n      \"cancelled\": 5,\n      \"updated\": 3,\n      \"conflictRate\": 4.0,\n      \"idempotencyHitRate\": 19.05\n    }\n  },\n  \"requestId\": \"req-abcdef1234\"\n}"
             }
           ]
         }
@@ -222,7 +222,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/availability?restaurantId=R1&sectorId=S1&date=2025-01-25&partySize=2",
+              "raw": "{{base_url}}/availability?restaurantId=R1&sectorId=S1&date=2026-01-25&partySize=2",
               "host": ["{{base_url}}"],
               "path": ["availability"],
               "query": [
@@ -238,7 +238,7 @@
                 },
                 {
                   "key": "date",
-                  "value": "2025-01-25",
+                  "value": "2026-01-25",
                   "description": "Date in YYYY-MM-DD format"
                 },
                 {
@@ -257,7 +257,7 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "{{base_url}}/availability?restaurantId=R1&sectorId=S1&date=2025-01-25&partySize=2",
+                  "raw": "{{base_url}}/availability?restaurantId=R1&sectorId=S1&date=2026-01-25&partySize=2",
                   "host": ["{{base_url}}"],
                   "path": ["availability"],
                   "query": [
@@ -271,7 +271,7 @@
                     },
                     {
                       "key": "date",
-                      "value": "2025-01-25"
+                      "value": "2026-01-25"
                     },
                     {
                       "key": "partySize",
@@ -289,7 +289,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"slotMinutes\": 15,\n  \"durationMinutes\": 75,\n  \"slots\": [\n    {\n      \"start\": \"2025-01-25T12:00:00-03:00\",\n      \"available\": true,\n      \"tables\": [\"T1\", \"T2\"]\n    },\n    {\n      \"start\": \"2025-01-25T12:15:00-03:00\",\n      \"available\": true,\n      \"tables\": [\"T3\", \"T4\"]\n    },\n    {\n      \"start\": \"2025-01-25T12:30:00-03:00\",\n      \"available\": false,\n      \"reason\": \"no_capacity\"\n    }\n  ]\n}"
+              "body": "{\n  \"slotMinutes\": 15,\n  \"durationMinutes\": 75,\n  \"slots\": [\n    {\n      \"start\": \"2026-01-25T12:00:00-03:00\",\n      \"available\": true,\n      \"tables\": [\"T1\", \"T2\"]\n    },\n    {\n      \"start\": \"2026-01-25T12:15:00-03:00\",\n      \"available\": true,\n      \"tables\": [\"T3\", \"T4\"]\n    },\n    {\n      \"start\": \"2026-01-25T12:30:00-03:00\",\n      \"available\": false,\n      \"reason\": \"no_capacity\"\n    }\n  ]\n}"
             }
           ]
         }
@@ -315,14 +315,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"restaurantId\": \"R1\",\n  \"sectorId\": \"S1\",\n  \"partySize\": 2,\n  \"startDateTimeISO\": \"2025-01-25T20:00:00-03:00\",\n  \"customer\": {\n    \"name\": \"John Doe\",\n    \"phone\": \"+54 9 11 5555-1234\",\n    \"email\": \"john@example.com\"\n  },\n  \"notes\": \"Window seat preferred\"\n}"
+              "raw": "{\n  \"restaurantId\": \"R1\",\n  \"sectorId\": \"S1\",\n  \"partySize\": 2,\n  \"startDateTimeISO\": \"2026-01-25T20:00:00-03:00\",\n  \"customer\": {\n    \"name\": \"John Doe\",\n    \"phone\": \"+54 9 11 5555-1234\",\n    \"email\": \"john@example.com\"\n  },\n  \"notes\": \"Window seat preferred\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/reservations",
               "host": ["{{base_url}}"],
               "path": ["reservations"]
             },
-            "description": "Create a new reservation. For large groups (partySize >= largeGroupThreshold), creates a PENDING hold that requires approval.\n\n**Date Format:** Accepts ISO 8601 datetime with timezone offset (e.g., `2025-01-25T20:00:00-03:00`) or UTC with Z (e.g., `2025-01-25T23:00:00Z`)."
+            "description": "Create a new reservation. For large groups (partySize >= largeGroupThreshold), creates a PENDING hold that requires approval.\n\n**Date Format:** Accepts ISO 8601 datetime with timezone offset (e.g., `2026-01-25T20:00:00-03:00`) or UTC with Z (e.g., `2026-01-25T23:00:00Z`).\n\n**Note:** Use future dates only. The system will reject dates in the past."
           },
           "response": [
             {
@@ -341,7 +341,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"restaurantId\": \"R1\",\n  \"sectorId\": \"S1\",\n  \"partySize\": 2,\n  \"startDateTimeISO\": \"2025-01-25T20:00:00-03:00\",\n  \"customer\": {\n    \"name\": \"John Doe\",\n    \"phone\": \"+54 9 11 5555-1234\",\n    \"email\": \"john@example.com\"\n  },\n  \"notes\": \"Window seat preferred\"\n}"
+                  "raw": "{\n  \"restaurantId\": \"R1\",\n  \"sectorId\": \"S1\",\n  \"partySize\": 2,\n  \"startDateTimeISO\": \"2026-01-25T20:00:00-03:00\",\n  \"customer\": {\n    \"name\": \"John Doe\",\n    \"phone\": \"+54 9 11 5555-1234\",\n    \"email\": \"john@example.com\"\n  },\n  \"notes\": \"Window seat preferred\"\n}"
                 },
                 "url": {
                   "raw": "{{base_url}}/reservations",
@@ -358,7 +358,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"id\": \"RES_ABC12345\",\n  \"restaurantId\": \"R1\",\n  \"sectorId\": \"S1\",\n  \"tableIds\": [\"T1\"],\n  \"partySize\": 2,\n  \"start\": \"2025-01-25T20:00:00-03:00\",\n  \"end\": \"2025-01-25T21:15:00-03:00\",\n  \"status\": \"CONFIRMED\",\n  \"customer\": {\n    \"name\": \"John Doe\",\n    \"phone\": \"+54 9 11 5555-1234\",\n    \"email\": \"john@example.com\",\n    \"createdAt\": \"2025-01-25T19:50:21-03:00\",\n    \"updatedAt\": \"2025-01-25T19:50:21-03:00\"\n  },\n  \"createdAt\": \"2025-01-25T19:50:21-03:00\",\n  \"updatedAt\": \"2025-01-25T19:50:21-03:00\"\n}"
+              "body": "{\n  \"id\": \"RES_ABC12345\",\n  \"restaurantId\": \"R1\",\n  \"sectorId\": \"S1\",\n  \"tableIds\": [\"T1\"],\n  \"partySize\": 2,\n  \"start\": \"2026-01-25T20:00:00-03:00\",\n  \"end\": \"2026-01-25T21:15:00-03:00\",\n  \"status\": \"CONFIRMED\",\n  \"customer\": {\n    \"name\": \"John Doe\",\n    \"phone\": \"+54 9 11 5555-1234\",\n    \"email\": \"john@example.com\",\n    \"createdAt\": \"2026-01-25T19:50:21-03:00\",\n    \"updatedAt\": \"2026-01-25T19:50:21-03:00\"\n  },\n  \"createdAt\": \"2026-01-25T19:50:21-03:00\",\n  \"updatedAt\": \"2026-01-25T19:50:21-03:00\"\n}"
             },
             {
               "name": "Created (Large Group - PENDING)",
@@ -372,7 +372,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"restaurantId\": \"R1\",\n  \"sectorId\": \"S1\",\n  \"partySize\": 10,\n  \"startDateTimeISO\": \"2025-01-25T20:00:00-03:00\",\n  \"customer\": {\n    \"name\": \"Jane Smith\",\n    \"phone\": \"+54 9 11 5555-5678\",\n    \"email\": \"jane@example.com\"\n  },\n  \"notes\": \"Anniversary dinner\"\n}"
+                  "raw": "{\n  \"restaurantId\": \"R1\",\n  \"sectorId\": \"S1\",\n  \"partySize\": 10,\n  \"startDateTimeISO\": \"2026-01-25T20:00:00-03:00\",\n  \"customer\": {\n    \"name\": \"Jane Smith\",\n    \"phone\": \"+54 9 11 5555-5678\",\n    \"email\": \"jane@example.com\"\n  },\n  \"notes\": \"Anniversary dinner\"\n}"
                 },
                 "url": {
                   "raw": "{{base_url}}/reservations",
@@ -389,7 +389,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"id\": \"RES_XYZ67890\",\n  \"restaurantId\": \"R1\",\n  \"sectorId\": \"S1\",\n  \"tableIds\": [\"T1\", \"T2\"],\n  \"partySize\": 10,\n  \"start\": \"2025-01-25T20:00:00-03:00\",\n  \"end\": \"2025-01-25T22:30:00-03:00\",\n  \"status\": \"PENDING\",\n  \"expiresAt\": \"2025-01-25T20:50:21-03:00\",\n  \"customer\": {\n    \"name\": \"Jane Smith\",\n    \"phone\": \"+54 9 11 5555-5678\",\n    \"email\": \"jane@example.com\",\n    \"createdAt\": \"2025-01-25T19:50:21-03:00\",\n    \"updatedAt\": \"2025-01-25T19:50:21-03:00\"\n  },\n  \"createdAt\": \"2025-01-25T19:50:21-03:00\",\n  \"updatedAt\": \"2025-01-25T19:50:21-03:00\"\n}"
+              "body": "{\n  \"id\": \"RES_XYZ67890\",\n  \"restaurantId\": \"R1\",\n  \"sectorId\": \"S1\",\n  \"tableIds\": [\"T1\", \"T2\"],\n  \"partySize\": 10,\n  \"start\": \"2026-01-25T20:00:00-03:00\",\n  \"end\": \"2026-01-25T22:30:00-03:00\",\n  \"status\": \"PENDING\",\n  \"expiresAt\": \"2026-01-25T20:50:21-03:00\",\n  \"customer\": {\n    \"name\": \"Jane Smith\",\n    \"phone\": \"+54 9 11 5555-5678\",\n    \"email\": \"jane@example.com\",\n    \"createdAt\": \"2026-01-25T19:50:21-03:00\",\n    \"updatedAt\": \"2026-01-25T19:50:21-03:00\"\n  },\n  \"createdAt\": \"2026-01-25T19:50:21-03:00\",\n  \"updatedAt\": \"2026-01-25T19:50:21-03:00\"\n}"
             },
             {
               "name": "No Capacity",
@@ -403,7 +403,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"restaurantId\": \"R1\",\n  \"sectorId\": \"S1\",\n  \"partySize\": 2,\n  \"startDateTimeISO\": \"2025-01-25T20:00:00-03:00\",\n  \"customer\": {\n    \"name\": \"John Doe\",\n    \"phone\": \"+54 9 11 5555-1234\",\n    \"email\": \"john@example.com\"\n  }\n}"
+                  "raw": "{\n  \"restaurantId\": \"R1\",\n  \"sectorId\": \"S1\",\n  \"partySize\": 2,\n  \"startDateTimeISO\": \"2026-01-25T20:00:00-03:00\",\n  \"customer\": {\n    \"name\": \"John Doe\",\n    \"phone\": \"+54 9 11 5555-1234\",\n    \"email\": \"john@example.com\"\n  }\n}"
                 },
                 "url": {
                   "raw": "{{base_url}}/reservations",
@@ -434,7 +434,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"restaurantId\": \"R1\",\n  \"sectorId\": \"S1\",\n  \"partySize\": 2,\n  \"startDateTimeISO\": \"2025-01-25T19:00:00-03:00\",\n  \"customer\": {\n    \"name\": \"John Doe\",\n    \"phone\": \"+54 9 11 5555-1234\",\n    \"email\": \"john@example.com\"\n  }\n}"
+                  "raw": "{\n  \"restaurantId\": \"R1\",\n  \"sectorId\": \"S1\",\n  \"partySize\": 2,\n  \"startDateTimeISO\": \"2026-01-25T19:00:00-03:00\",\n  \"customer\": {\n    \"name\": \"John Doe\",\n    \"phone\": \"+54 9 11 5555-1234\",\n    \"email\": \"john@example.com\"\n  }\n}"
                 },
                 "url": {
                   "raw": "{{base_url}}/reservations",
@@ -461,7 +461,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/reservations/day?restaurantId=R1&date=2025-01-25&sectorId=S1",
+              "raw": "{{base_url}}/reservations/day?restaurantId=R1&date=2026-01-25&sectorId=S1",
               "host": ["{{base_url}}"],
               "path": ["reservations", "day"],
               "query": [
@@ -472,7 +472,7 @@
                 },
                 {
                   "key": "date",
-                  "value": "2025-01-25",
+                  "value": "2026-01-25",
                   "description": "Date in YYYY-MM-DD format"
                 },
                 {
@@ -491,7 +491,7 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "{{base_url}}/reservations/day?restaurantId=R1&date=2025-01-25&sectorId=S1",
+                  "raw": "{{base_url}}/reservations/day?restaurantId=R1&date=2026-01-25&sectorId=S1",
                   "host": ["{{base_url}}"],
                   "path": ["reservations", "day"],
                   "query": [
@@ -501,7 +501,7 @@
                     },
                     {
                       "key": "date",
-                      "value": "2025-01-25"
+                      "value": "2026-01-25"
                     },
                     {
                       "key": "sectorId",
@@ -519,7 +519,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"date\": \"2025-01-25\",\n  \"items\": [\n    {\n      \"id\": \"RES_ABC12345\",\n      \"restaurantId\": \"R1\",\n      \"sectorId\": \"S1\",\n      \"tableIds\": [\"T1\"],\n      \"partySize\": 2,\n      \"start\": \"2025-01-25T20:00:00-03:00\",\n      \"end\": \"2025-01-25T21:15:00-03:00\",\n      \"status\": \"CONFIRMED\",\n      \"customer\": {\n        \"name\": \"John Doe\",\n        \"phone\": \"+54 9 11 5555-1234\",\n        \"email\": \"john@example.com\",\n        \"createdAt\": \"2025-01-25T19:50:21-03:00\",\n        \"updatedAt\": \"2025-01-25T19:50:21-03:00\"\n      },\n      \"createdAt\": \"2025-01-25T19:50:21-03:00\",\n      \"updatedAt\": \"2025-01-25T19:50:21-03:00\"\n    }\n  ]\n}"
+              "body": "{\n  \"date\": \"2026-01-25\",\n  \"items\": [\n    {\n      \"id\": \"RES_ABC12345\",\n      \"restaurantId\": \"R1\",\n      \"sectorId\": \"S1\",\n      \"tableIds\": [\"T1\"],\n      \"partySize\": 2,\n      \"start\": \"2026-01-25T20:00:00-03:00\",\n      \"end\": \"2026-01-25T21:15:00-03:00\",\n      \"status\": \"CONFIRMED\",\n      \"customer\": {\n        \"name\": \"John Doe\",\n        \"phone\": \"+54 9 11 5555-1234\",\n        \"email\": \"john@example.com\",\n        \"createdAt\": \"2026-01-25T19:50:21-03:00\",\n        \"updatedAt\": \"2026-01-25T19:50:21-03:00\"\n      },\n      \"createdAt\": \"2026-01-25T19:50:21-03:00\",\n      \"updatedAt\": \"2026-01-25T19:50:21-03:00\"\n    }\n  ]\n}"
             }
           ]
         },
@@ -540,7 +540,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"sectorId\": \"S2\",\n  \"partySize\": 4,\n  \"startDateTimeISO\": \"2025-01-25T21:00:00-03:00\",\n  \"customer\": {\n    \"name\": \"John Doe Updated\",\n    \"phone\": \"+54 9 11 9999-8888\",\n    \"email\": \"john.updated@example.com\"\n  },\n  \"notes\": \"Updated notes for anniversary\"\n}"
+              "raw": "{\n  \"sectorId\": \"S2\",\n  \"partySize\": 4,\n  \"startDateTimeISO\": \"2026-01-25T21:00:00-03:00\",\n  \"customer\": {\n    \"name\": \"John Doe Updated\",\n    \"phone\": \"+54 9 11 9999-8888\",\n    \"email\": \"john.updated@example.com\"\n  },\n  \"notes\": \"Updated notes for anniversary\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/reservations/:id",
@@ -554,7 +554,7 @@
                 }
               ]
             },
-            "description": "Update an existing reservation. All fields are optional. If sectorId, startDateTimeISO, or partySize changes, tables will be re-assigned.\n\n**Date Format:** Accepts ISO 8601 datetime with timezone offset (e.g., `2025-01-25T20:00:00-03:00`) or UTC with Z (e.g., `2025-01-25T23:00:00Z`)."
+            "description": "Update an existing reservation. All fields are optional. If sectorId, startDateTimeISO, or partySize changes, tables will be re-assigned.\n\n**Date Format:** Accepts ISO 8601 datetime with timezone offset (e.g., `2026-01-25T20:00:00-03:00`) or UTC with Z (e.g., `2026-01-25T23:00:00Z`).\n\n**Note:** Use future dates only. The system will reject dates in the past."
           },
           "response": [
             {
@@ -573,7 +573,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"sectorId\": \"S2\",\n  \"partySize\": 4,\n  \"startDateTimeISO\": \"2025-01-25T21:00:00-03:00\",\n  \"customer\": {\n    \"name\": \"John Doe Updated\",\n    \"phone\": \"+54 9 11 9999-8888\",\n    \"email\": \"john.updated@example.com\"\n  },\n  \"notes\": \"Updated notes for anniversary\"\n}"
+                  "raw": "{\n  \"sectorId\": \"S2\",\n  \"partySize\": 4,\n  \"startDateTimeISO\": \"2026-01-25T21:00:00-03:00\",\n  \"customer\": {\n    \"name\": \"John Doe Updated\",\n    \"phone\": \"+54 9 11 9999-8888\",\n    \"email\": \"john.updated@example.com\"\n  },\n  \"notes\": \"Updated notes for anniversary\"\n}"
                 },
                 "url": {
                   "raw": "{{base_url}}/reservations/RES_ABC12345",
@@ -590,7 +590,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"id\": \"RES_ABC12345\",\n  \"restaurantId\": \"R1\",\n  \"sectorId\": \"S2\",\n  \"tableIds\": [\"T5\"],\n  \"partySize\": 4,\n  \"start\": \"2025-01-25T21:00:00-03:00\",\n  \"end\": \"2025-01-25T22:30:00-03:00\",\n  \"status\": \"CONFIRMED\",\n  \"customer\": {\n    \"name\": \"John Doe Updated\",\n    \"phone\": \"+54 9 11 9999-8888\",\n    \"email\": \"john.updated@example.com\",\n    \"createdAt\": \"2025-01-25T19:50:21-03:00\",\n    \"updatedAt\": \"2025-01-25T20:15:30-03:00\"\n  },\n  \"createdAt\": \"2025-01-25T19:50:21-03:00\",\n  \"updatedAt\": \"2025-01-25T20:15:30-03:00\"\n}"
+              "body": "{\n  \"id\": \"RES_ABC12345\",\n  \"restaurantId\": \"R1\",\n  \"sectorId\": \"S2\",\n  \"tableIds\": [\"T5\"],\n  \"partySize\": 4,\n  \"start\": \"2026-01-25T21:00:00-03:00\",\n  \"end\": \"2026-01-25T22:30:00-03:00\",\n  \"status\": \"CONFIRMED\",\n  \"customer\": {\n    \"name\": \"John Doe Updated\",\n    \"phone\": \"+54 9 11 9999-8888\",\n    \"email\": \"john.updated@example.com\",\n    \"createdAt\": \"2026-01-25T19:50:21-03:00\",\n    \"updatedAt\": \"2026-01-25T20:15:30-03:00\"\n  },\n  \"createdAt\": \"2026-01-25T19:50:21-03:00\",\n  \"updatedAt\": \"2026-01-25T20:15:30-03:00\"\n}"
             }
           ]
         },
