@@ -371,7 +371,20 @@ export default function Home() {
                 min="1"
                 max="20"
                 value={partySize}
-                onChange={(e) => setPartySize(parseInt(e.target.value) || 1)}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value) || 1;
+                  // Enforce max value of 20
+                  const clampedValue = Math.min(Math.max(value, 1), 20);
+                  setPartySize(clampedValue);
+                }}
+                onBlur={(e) => {
+                  // Ensure value is within bounds on blur
+                  const value = parseInt(e.target.value) || 1;
+                  const clampedValue = Math.min(Math.max(value, 1), 20);
+                  if (clampedValue !== partySize) {
+                    setPartySize(clampedValue);
+                  }
+                }}
                 className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 transition-all"
               />
             </div>
