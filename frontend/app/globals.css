@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Tailwind CSS 4: Define dark mode variant using class strategy */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -12,11 +15,9 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Ensure dark mode works with class strategy */
+html.dark {
+  color-scheme: dark;
 }
 
 body {

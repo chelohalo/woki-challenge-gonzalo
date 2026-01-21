@@ -4,21 +4,30 @@ export const api = {
   async get<T>(path: string): Promise<T> {
     const response = await fetch(`${API_URL}${path}`);
     if (!response.ok) {
-      throw new Error(`API Error: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`API Error: ${response.statusText} - ${errorText}`);
     }
     return response.json();
   },
 
-  async post<T>(path: string, body: unknown): Promise<T> {
+  async post<T>(path: string, body: unknown, idempotencyKey?: string): Promise<T> {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (idempotencyKey) {
+      headers['idempotency-key'] = idempotencyKey;
+    }
+
     const response = await fetch(`${API_URL}${path}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify(body),
     });
+    
     if (!response.ok) {
-      throw new Error(`API Error: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`API Error: ${response.statusText} - ${errorText}`);
     }
     return response.json();
   },
@@ -28,7 +37,40 @@ export const api = {
       method: 'DELETE',
     });
     if (!response.ok) {
-      throw new Error(`API Error: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`API Error: ${response.statusText} - ${errorText}`);
     }
   },
+};
+
+// API endpoints
+export const availabilityApi = {
+  get: (restaurantId: string, sectorId: string, date: string, partySize: number) =>
+    api.get<import('../types').AvailabilityResponse>(
+      `/availability?restaurantId=${restaurantId}&sectorId=${sectorId}&date=${date}&partySize=${partySize}`
+    ),
+};
+
+export const reservationsApi = {
+  create: (data: {
+    restaurantId: string;
+    sectorId: string;
+    partySize: number;
+    startDateTimeISO: string;
+    customer: {
+      name: string;
+      phone: string;
+      email: string;
+    };
+    notes?: string;
+  }, idempotencyKey?: string) =>
+    api.post<import('../types').Reservation>('/reservations', data, idempotencyKey),
+
+  cancel: (id: string) => api.delete(`/reservations/${id}`),
+
+  getByDay: (restaurantId: string, date: string, sectorId?: string) =>
+    api.get<{
+      date: string;
+      items: import('../types').Reservation[];
+    }>(`/reservations/day?restaurantId=${restaurantId}&date=${date}${sectorId ? `&sectorId=${sectorId}` : ''}`),
 };

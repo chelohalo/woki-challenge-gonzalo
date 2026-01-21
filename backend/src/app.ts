@@ -1,4 +1,5 @@
 import Fastify from 'fastify';
+import cors from '@fastify/cors';
 import { env } from './config/env.js';
 import { availabilityRoutes } from './routes/availability.routes.js';
 import { reservationsRoutes } from './routes/reservations.routes.js';
@@ -8,6 +9,14 @@ const app = Fastify({
   logger: {
     level: env.NODE_ENV === 'production' ? 'info' : 'debug',
   },
+});
+
+// CORS configuration
+app.register(cors, {
+  origin: env.NODE_ENV === 'production' 
+    ? process.env.FRONTEND_URL || 'https://your-frontend-domain.com'
+    : ['http://localhost:3000', 'http://127.0.0.1:3000'],
+  credentials: true,
 });
 
 // Error handler

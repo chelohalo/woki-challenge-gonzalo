@@ -20,6 +20,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@fastify/cors": "^9.0.1",
     "@libsql/client": "^0.14.0",
     "async-mutex": "^0.5.0",
     "date-fns": "^3.6.0",
