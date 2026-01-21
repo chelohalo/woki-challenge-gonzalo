@@ -58,6 +58,33 @@ export const api = {
       stopLoading();
     }
   },
+
+  async patch<T>(path: string, body: unknown, idempotencyKey?: string): Promise<T> {
+    startLoading();
+    try {
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (idempotencyKey) {
+        headers['idempotency-key'] = idempotencyKey;
+      }
+
+      const response = await fetch(`${API_URL}${path}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify(body),
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API Error: ${response.statusText} - ${errorText}`);
+      }
+      return response.json();
+    } finally {
+      stopLoading();
+    }
+  },
 };
 
 // API endpoints

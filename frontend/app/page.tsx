@@ -33,6 +33,7 @@ export default function Home() {
   const [editingReservation, setEditingReservation] = useState<Reservation | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [durationMinutes, setDurationMinutes] = useState<number>(90);
   const isApiLoading = useApiLoading();
 
   // Check authentication on mount
