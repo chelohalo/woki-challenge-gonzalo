@@ -28,6 +28,10 @@ export async function assignTable(
   );
 
   // 4. Find first table without overlap
+  // Use timestamp comparison to handle timezone differences
+  const startTime = new Date(startDateTimeISO).getTime();
+  const endTime = new Date(endDateTimeISO).getTime();
+
   for (const table of sortedTables) {
     const overlapping = await getOverlappingReservations(
       [table.id],
@@ -35,7 +39,14 @@ export async function assignTable(
       endDateTimeISO
     );
 
-    if (overlapping.length === 0) {
+    // Double-check with timestamp comparison
+    const hasOverlap = overlapping.some((r) => {
+      const rStart = new Date(r.startDateTime).getTime();
+      const rEnd = new Date(r.endDateTime).getTime();
+      return rStart < endTime && rEnd > startTime;
+    });
+
+    if (!hasOverlap) {
       return table.id;
     }
   }

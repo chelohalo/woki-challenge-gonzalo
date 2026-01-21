@@ -1,6 +1,7 @@
 import { db } from '../db/index.js';
 import { reservations } from '../db/schema.js';
-import { eq, and, gte, lt } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
+import { getZonedDayStartUTC } from '../utils/datetime.js';
 
 export async function getReservationById(id: string) {
   const result = await db
@@ -14,17 +15,22 @@ export async function getReservationById(id: string) {
 export async function getReservationsByDay(
   restaurantId: string,
   date: Date,
-  sectorId?: string
+  sectorId?: string,
+  timezone?: string
 ) {
-  const dayStart = new Date(date);
-  dayStart.setHours(0, 0, 0, 0);
-  const dayEnd = new Date(date);
-  dayEnd.setHours(23, 59, 59, 999);
+  // Get restaurant timezone if not provided (we'll need to fetch it)
+  // For now, assume it's passed or use a default
+  const tz = timezone || 'UTC';
+  
+  // Get calendar day bounds in UTC (representing local day in restaurant timezone)
+  const dayStartUTC = getZonedDayStartUTC(date, tz);
+  const dayEndUTC = new Date(dayStartUTC);
+  dayEndUTC.setUTCHours(23, 59, 59, 999);
 
+  // Get all confirmed reservations for the restaurant (and sector if specified)
+  // Filter by timestamp in memory to avoid timezone issues with string comparison
   const conditions = [
     eq(reservations.restaurantId, restaurantId),
-    gte(reservations.startDateTime, dayStart.toISOString()),
-    lt(reservations.startDateTime, dayEnd.toISOString()),
     eq(reservations.status, 'CONFIRMED'),
   ];
 
@@ -32,7 +38,16 @@ export async function getReservationsByDay(
     conditions.push(eq(reservations.sectorId, sectorId));
   }
 
-  return db.select().from(reservations).where(and(...conditions));
+  const allReservations = await db.select().from(reservations).where(and(...conditions));
+
+  // Filter by day using timestamp comparison (handles timezone correctly)
+  const dayStartTime = dayStartUTC.getTime();
+  const dayEndTime = dayEndUTC.getTime();
+
+  return allReservations.filter((r) => {
+    const rStartTime = new Date(r.startDateTime).getTime();
+    return rStartTime >= dayStartTime && rStartTime < dayEndTime;
+  });
 }
 
 export async function getOverlappingReservations(
@@ -40,24 +55,23 @@ export async function getOverlappingReservations(
   startDateTime: string,
   endDateTime: string
 ) {
-  // Get all confirmed reservations that might overlap
-  // Overlap: (start < endDateTime) AND (end > startDateTime)
+  // Get all confirmed reservations
+  // We need to check ALL reservations, not just by date, because overlaps can span days
   const allReservations = await db
     .select()
     .from(reservations)
-    .where(
-      and(
-        eq(reservations.status, 'CONFIRMED'),
-        // start < endDateTime
-        // end > startDateTime
-        // We'll filter in memory for the overlap check
-      )
-    );
+    .where(eq(reservations.status, 'CONFIRMED'));
 
-  // Filter by overlap and table IDs
+  // Filter by overlap and table IDs using timestamp comparison
+  const startTime = new Date(startDateTime).getTime();
+  const endTime = new Date(endDateTime).getTime();
+
   return allReservations.filter((r) => {
+    const rStartTime = new Date(r.startDateTime).getTime();
+    const rEndTime = new Date(r.endDateTime).getTime();
+    
     // Check overlap: (r.start < endDateTime) AND (r.end > startDateTime)
-    const overlaps = r.startDateTime < endDateTime && r.endDateTime > startDateTime;
+    const overlaps = rStartTime < endTime && rEndTime > startTime;
     if (!overlaps) return false;
     
     // Check if any table overlaps

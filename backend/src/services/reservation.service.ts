@@ -8,6 +8,7 @@ import {
   cancelReservation as cancelReservationRepo,
 } from '../repositories/reservation.repository.js';
 import { addMinutesToDate, formatISODateTime, isWithinShift } from '../utils/datetime.js';
+import { acquireLock } from '../utils/locks.js';
 import { Errors } from '../utils/errors.js';
 import type { Customer } from '../types/index.js';
 
@@ -21,78 +22,86 @@ export async function createReservationService(data: {
   customer: Customer;
   notes?: string;
 }) {
-  // 1. Validate restaurant and sector exist
-  const restaurant = await getRestaurantById(data.restaurantId);
-  if (!restaurant) {
-    throw Errors.NOT_FOUND('Restaurant');
-  }
+  // Acquire lock for this sector+slot to prevent concurrent bookings
+  const releaseLock = await acquireLock(data.sectorId, data.startDateTimeISO);
 
-  const sector = await getSectorById(data.sectorId);
-  if (!sector) {
-    throw Errors.NOT_FOUND('Sector');
-  }
+  try {
+    // 1. Validate restaurant and sector exist
+    const restaurant = await getRestaurantById(data.restaurantId);
+    if (!restaurant) {
+      throw Errors.NOT_FOUND('Restaurant');
+    }
 
-  // 2. Validate time is within shifts
-  const startDate = new Date(data.startDateTimeISO);
-  if (!isWithinShift(startDate, restaurant.timezone, restaurant.shifts || undefined)) {
-    throw Errors.OUTSIDE_SERVICE_WINDOW();
-  }
+    const sector = await getSectorById(data.sectorId);
+    if (!sector) {
+      throw Errors.NOT_FOUND('Sector');
+    }
 
-  // 3. Assign table
-  const tableId = await assignTable(data.sectorId, data.startDateTimeISO, data.partySize);
-  if (!tableId) {
-    throw Errors.NO_CAPACITY();
-  }
+    // 2. Validate time is within shifts
+    const startDate = new Date(data.startDateTimeISO);
+    if (!isWithinShift(startDate, restaurant.timezone, restaurant.shifts || undefined)) {
+      throw Errors.OUTSIDE_SERVICE_WINDOW();
+    }
 
-  // 4. Calculate end time
-  const endDate = addMinutesToDate(startDate, RESERVATION_DURATION_MINUTES);
-  const endDateTimeISO = formatISODateTime(endDate);
+    // 3. Assign table (within lock to prevent race conditions)
+    const tableId = await assignTable(data.sectorId, data.startDateTimeISO, data.partySize);
+    if (!tableId) {
+      throw Errors.NO_CAPACITY();
+    }
 
-  // 5. Create reservation
-  const now = formatISODateTime(new Date());
-  const reservationId = `RES_${nanoid(8).toUpperCase()}`;
+    // 4. Calculate end time
+    const endDate = addMinutesToDate(startDate, RESERVATION_DURATION_MINUTES);
+    const endDateTimeISO = formatISODateTime(endDate);
 
-  const reservation = await createReservation({
-    id: reservationId,
-    restaurantId: data.restaurantId,
-    sectorId: data.sectorId,
-    tableIds: [tableId],
-    partySize: data.partySize,
-    startDateTime: data.startDateTimeISO,
-    endDateTime: endDateTimeISO,
-    status: 'CONFIRMED',
-    customerName: data.customer.name,
-    customerPhone: data.customer.phone,
-    customerEmail: data.customer.email,
-    notes: data.notes,
-    createdAt: now,
-    updatedAt: now,
-  });
+    // 5. Create reservation
+    const now = formatISODateTime(new Date());
+    const reservationId = `RES_${nanoid(8).toUpperCase()}`;
 
-  if (!reservation) {
-    throw new Error('Failed to create reservation');
-  }
+    const reservation = await createReservation({
+      id: reservationId,
+      restaurantId: data.restaurantId,
+      sectorId: data.sectorId,
+      tableIds: [tableId],
+      partySize: data.partySize,
+      startDateTime: data.startDateTimeISO,
+      endDateTime: endDateTimeISO,
+      status: 'CONFIRMED',
+      customerName: data.customer.name,
+      customerPhone: data.customer.phone,
+      customerEmail: data.customer.email,
+      notes: data.notes,
+      createdAt: now,
+      updatedAt: now,
+    });
 
-  // 6. Format response
-  return {
-    id: reservation.id,
-    restaurantId: reservation.restaurantId,
-    sectorId: reservation.sectorId,
-    tableIds: reservation.tableIds,
-    partySize: reservation.partySize,
-    start: reservation.startDateTime,
-    end: reservation.endDateTime,
-    status: reservation.status,
-    customer: {
-      name: reservation.customerName,
-      phone: reservation.customerPhone,
-      email: reservation.customerEmail,
+    if (!reservation) {
+      throw new Error('Failed to create reservation');
+    }
+
+    // 6. Format response
+    return {
+      id: reservation.id,
+      restaurantId: reservation.restaurantId,
+      sectorId: reservation.sectorId,
+      tableIds: reservation.tableIds,
+      partySize: reservation.partySize,
+      start: reservation.startDateTime,
+      end: reservation.endDateTime,
+      status: reservation.status,
+      customer: {
+        name: reservation.customerName,
+        phone: reservation.customerPhone,
+        email: reservation.customerEmail,
+        createdAt: reservation.createdAt,
+        updatedAt: reservation.updatedAt,
+      },
       createdAt: reservation.createdAt,
       updatedAt: reservation.updatedAt,
-    },
-    createdAt: reservation.createdAt,
-    updatedAt: reservation.updatedAt,
-  };
+    };
+  } finally {
+    // Always release lock, even if there's an error
+    releaseLock();
+  }
 }
 
 export async function cancelReservationService(id: string) {
@@ -115,7 +124,14 @@ export async function getReservationsByDayService(
   sectorId?: string
 ) {
   const { getReservationsByDay } = await import('../repositories/reservation.repository.js');
-  const reservations = await getReservationsByDay(restaurantId, date, sectorId);
+  // Get restaurant to pass timezone
+  const restaurant = await getRestaurantById(restaurantId);
+  const reservations = await getReservationsByDay(
+    restaurantId,
+    date,
+    sectorId,
+    restaurant?.timezone
+  );
 
   return reservations.map((r) => ({
     id: r.id,

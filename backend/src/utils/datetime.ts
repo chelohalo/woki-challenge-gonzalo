@@ -1,5 +1,15 @@
-import { format, parse, addMinutes, startOfDay, eachMinuteOfInterval } from 'date-fns';
-import { toZonedTime, fromZonedTime, formatInTimeZone } from 'date-fns-tz';
+import { format, parse, addMinutes, eachMinuteOfInterval } from 'date-fns';
+import { toZonedTime, fromZonedTime } from 'date-fns-tz';
+
+/**
+ * Helpers
+ */
+function ymdFromUTC(date: Date): string {
+  const y = date.getUTCFullYear();
+  const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(date.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
 
 export function parseISODateTime(iso: string): Date {
   return new Date(iso);
@@ -22,10 +32,41 @@ export function addMinutesToDate(date: Date, minutes: number): Date {
   return addMinutes(date, minutes);
 }
 
+/**
+ * Get the start of a calendar day in the restaurant's timezone, converted to UTC.
+ * IMPORTANT:
+ * - Treats the input Date as a "calendar day" (YYYY-MM-DD)
+ * - Builds the day from UTC parts to avoid JS Date timezone pitfalls
+ */
+export function getZonedDayStartUTC(date: Date, timezone: string): Date {
+  const ymd = ymdFromUTC(date);
+  const localMidnight = parse(
+    `${ymd}T00:00:00`,
+    "yyyy-MM-dd'T'HH:mm:ss",
+    new Date()
+  );
+  return fromZonedTime(localMidnight, timezone);
+}
+
+/**
+ * Convert a local time (HH:mm) on a given calendar day to UTC,
+ * interpreting it as being in the restaurant's timezone.
+ */
+function localTimeToUTC(date: Date, timeStr: string, timezone: string): Date {
+  const ymd = ymdFromUTC(date);
+  const localTimeStr = `${ymd}T${timeStr}:00`;
+
+  const parsed = parse(
+    localTimeStr,
+    "yyyy-MM-dd'T'HH:mm:ss",
+    new Date()
+  );
+
+  return fromZonedTime(parsed, timezone);
+}
+
 export function getStartOfDay(date: Date, timezone: string): Date {
-  const zonedDate = toZonedTime(date, timezone);
-  const start = startOfDay(zonedDate);
-  return fromZonedTime(start, timezone);
+  return getZonedDayStartUTC(date, timezone);
 }
 
 export function generate15MinSlots(
@@ -33,46 +74,36 @@ export function generate15MinSlots(
   timezone: string,
   shifts?: Array<{ start: string; end: string }>
 ): Date[] {
-  const slots: Date[] = [];
-  
-  // Get the date in the restaurant's timezone
-  const zonedDate = toZonedTime(date, timezone);
-  const dayStart = startOfDay(zonedDate);
-  
+  // Start of the calendar day (UTC)
+  const dayStartUTC = getZonedDayStartUTC(date, timezone);
+
+  // Full-day scheduling (00:00 → last slot that can fit 90 minutes)
   if (!shifts || shifts.length === 0) {
-    // Full day: 00:00 to 23:45 (last slot that can fit 90min reservation)
-    const dayEnd = addMinutes(dayStart, 24 * 60 - 90);
-    const intervalSlots = eachMinuteOfInterval(
-      { start: dayStart, end: dayEnd },
+    const dayEndUTC = addMinutes(dayStartUTC, 24 * 60 - 90);
+    return eachMinuteOfInterval(
+      { start: dayStartUTC, end: dayEndUTC },
       { step: 15 }
     );
-    // Convert back to UTC
-    return intervalSlots.map(slot => fromZonedTime(slot, timezone));
   }
 
-  // Generate slots for each shift
+  // Shifts-based scheduling
+  const slots: Date[] = [];
+
   for (const shift of shifts) {
-    const [startHour, startMin] = shift.start.split(':').map(Number);
-    const [endHour, endMin] = shift.end.split(':').map(Number);
-    
-    const shiftStart = new Date(dayStart);
-    shiftStart.setHours(startHour, startMin, 0, 0);
-    
-    const shiftEnd = new Date(dayStart);
-    shiftEnd.setHours(endHour, endMin, 0, 0);
-    
-    // Ensure we don't create slots that would end after shift end
-    const maxSlotStart = addMinutes(shiftEnd, -90);
-    const actualEnd = shiftStart > maxSlotStart ? shiftStart : maxSlotStart;
-    
+    const shiftStartUTC = localTimeToUTC(date, shift.start, timezone);
+    const shiftEndUTC = localTimeToUTC(date, shift.end, timezone);
+
+    // Last slot start that can still fit a 90-minute reservation
+    const maxSlotStart = addMinutes(shiftEndUTC, -90);
+    const actualEnd =
+      shiftStartUTC > maxSlotStart ? shiftStartUTC : maxSlotStart;
+
     const shiftSlots = eachMinuteOfInterval(
-      { start: shiftStart, end: actualEnd },
+      { start: shiftStartUTC, end: actualEnd },
       { step: 15 }
     );
-    
-    // Convert to UTC
-    const utcSlots = shiftSlots.map(slot => fromZonedTime(slot, timezone));
-    slots.push(...utcSlots);
+
+    slots.push(...shiftSlots);
   }
 
   return slots;
@@ -84,17 +115,13 @@ export function isWithinShift(
   shifts?: Array<{ start: string; end: string }>
 ): boolean {
   if (!shifts || shifts.length === 0) {
-    return true; // Full day available
+    return true;
   }
 
   const zonedDate = toZonedTime(dateTime, timezone);
   const timeStr = formatTime(zonedDate);
 
-  for (const shift of shifts) {
-    if (timeStr >= shift.start && timeStr < shift.end) {
-      return true;
-    }
-  }
-
-  return false;
+  return shifts.some(
+    (shift) => timeStr >= shift.start && timeStr < shift.end
+  );
 }
