@@ -10,6 +10,8 @@ export const restaurants = sqliteTable('restaurants', {
   durationRules: text('duration_rules', { mode: 'json' }).$type<Array<{ maxPartySize: number; durationMinutes: number }>>(),
   minAdvanceMinutes: integer('min_advance_minutes'),
   maxAdvanceDays: integer('max_advance_days'),
+  largeGroupThreshold: integer('large_group_threshold'),
+  pendingHoldTTLMinutes: integer('pending_hold_ttl_minutes'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 });
@@ -41,6 +43,7 @@ export const reservations = sqliteTable('reservations', {
   startDateTime: text('start_date_time').notNull(),
   endDateTime: text('end_date_time').notNull(),
   status: text('status', { enum: ['CONFIRMED', 'PENDING', 'CANCELLED'] }).notNull(),
+  expiresAt: text('expires_at'), // For PENDING holds - TTL expiration time
   customerName: text('customer_name').notNull(),
   customerPhone: text('customer_phone').notNull(),
   customerEmail: text('customer_email').notNull(),

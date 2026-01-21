@@ -5,6 +5,12 @@ export interface Restaurant {
   name: string;
   timezone: string;
   shifts?: Array<{ start: string; end: string }>;
+  reservationDurationMinutes: number;
+  durationRules?: Array<{ maxPartySize: number; durationMinutes: number }>;
+  minAdvanceMinutes?: number | null;
+  maxAdvanceDays?: number | null;
+  largeGroupThreshold?: number | null;
+  pendingHoldTTLMinutes?: number | null;
   createdAt: ISODateTime;
   updatedAt: ISODateTime;
 }
@@ -49,6 +55,7 @@ export interface Reservation {
   startDateTimeISO: ISODateTime;
   endDateTimeISO: ISODateTime;
   status: ReservationStatus;
+  expiresAt?: ISODateTime; // For PENDING holds - TTL expiration time
   customer: Customer;
   notes?: string;
   createdAt: ISODateTime;

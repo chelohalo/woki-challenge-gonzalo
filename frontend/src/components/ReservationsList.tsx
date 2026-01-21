@@ -6,10 +6,20 @@ import type { Reservation } from '../types';
 interface ReservationsListProps {
   reservations: Reservation[];
   onCancel: (id: string) => Promise<void>;
+  onEdit?: (reservation: Reservation) => void;
+  onApprove?: (id: string) => Promise<void>;
+  onReject?: (id: string) => Promise<void>;
   isLoading?: boolean;
 }
 
-export function ReservationsList({ reservations, onCancel, isLoading }: ReservationsListProps) {
+export function ReservationsList({
+  reservations,
+  onCancel,
+  onEdit,
+  onApprove,
+  onReject,
+  isLoading,
+}: ReservationsListProps) {
   const formatDateTime = (isoString: string) => {
     try {
       const date = parseISO(isoString);
@@ -68,8 +78,20 @@ export function ReservationsList({ reservations, onCancel, isLoading }: Reservat
                 <strong>Party Size:</strong> {reservation.partySize} people
               </p>
               <p className="text-sm text-gray-700 dark:text-gray-300">
-                <strong>Tables:</strong> {reservation.tableIds.join(', ')}
+                <strong>Tables:</strong>{' '}
+                {reservation.tableIds.length > 1 ? (
+                  <span className="font-medium">
+                    {reservation.tableIds.join(' + ')} ({reservation.tableIds.length} tables)
+                  </span>
+                ) : (
+                  reservation.tableIds.join(', ')
+                )}
               </p>
+              {reservation.expiresAt && reservation.status === 'PENDING' && (
+                <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
+                  ⏰ Expires: {formatDateTime(reservation.expiresAt)}
+                </p>
+              )}
               {reservation.customer.phone && (
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   📞 {reservation.customer.phone}
@@ -80,15 +102,44 @@ export function ReservationsList({ reservations, onCancel, isLoading }: Reservat
                   ✉️ {reservation.customer.email}
                 </p>
               )}
+              {reservation.notes && (
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 italic">
+                  📝 {reservation.notes}
+                </p>
+              )}
             </div>
-            {reservation.status === 'CONFIRMED' && (
+            <div className="flex flex-col gap-2 ml-4">
+              {reservation.status === 'PENDING' && onApprove && onReject && (
+                <>
+                  <button
+                    onClick={() => onApprove(reservation.id)}
+                    className="px-4 py-2 bg-green-600 dark:bg-green-500 text-white rounded-md hover:bg-green-700 dark:hover:bg-green-600 transition-colors text-sm"
+                  >
+                    Approve
+                  </button>
+                  <button
+                    onClick={() => onReject(reservation.id)}
+                    className="px-4 py-2 bg-red-600 dark:bg-red-500 text-white rounded-md hover:bg-red-700 dark:hover:bg-red-600 transition-colors text-sm"
+                  >
+                    Reject
+                  </button>
+                </>
+              )}
+              {reservation.status === 'CONFIRMED' && onEdit && (
+                <button
+                  onClick={() => onEdit(reservation)}
+                  className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors text-sm mb-2"
+                >
+                  Edit
+                </button>
+              )}
               <button
                 onClick={() => onCancel(reservation.id)}
-                className="ml-4 px-3 py-1 text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                className="px-4 py-2 bg-red-600 dark:bg-red-500 text-white rounded-md hover:bg-red-700 dark:hover:bg-red-600 transition-colors text-sm"
               >
                 Cancel
               </button>
-            )}
+            </div>
           </div>
         </div>
       ))}

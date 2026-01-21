@@ -32,6 +32,8 @@ async function seed() {
     ],
     minAdvanceMinutes: 30, // At least 30 minutes in advance
     maxAdvanceDays: 30, // Up to 30 days in advance
+    largeGroupThreshold: 8, // Groups of 8+ require approval
+    pendingHoldTTLMinutes: 60, // Pending holds expire after 60 minutes
     createdAt: baseDate,
     updatedAt: baseDate,
   });

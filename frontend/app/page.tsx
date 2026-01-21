@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { format, addDays, subDays } from 'date-fns';
 import { AvailabilityGrid } from '../src/components/AvailabilityGrid';
 import { ReservationForm } from '../src/components/ReservationForm';
+import { EditReservationForm } from '../src/components/EditReservationForm';
 import { ReservationsList } from '../src/components/ReservationsList';
 import { ThemeToggle } from '../src/components/ThemeToggle';
 import { Login } from '../src/components/Login';
@@ -29,6 +30,7 @@ export default function Home() {
   const [availability, setAvailability] = useState<AvailabilitySlot[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(null);
+  const [editingReservation, setEditingReservation] = useState<Reservation | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isApiLoading = useApiLoading();
@@ -49,6 +51,7 @@ export default function Home() {
     try {
       const data = await availabilityApi.get(RESTAURANT_ID, selectedSector, dateString, partySize);
       setAvailability(data.slots);
+      setDurationMinutes(data.durationMinutes);
     } catch (err: any) {
       setError(err.message || 'Failed to load availability');
       setAvailability([]);
@@ -108,6 +111,40 @@ export default function Home() {
       loadReservations();
     } catch (err: any) {
       alert(err.message || 'Failed to cancel reservation');
+    }
+  };
+
+  const handleEditReservation = (reservation: Reservation) => {
+    setEditingReservation(reservation);
+  };
+
+  const handleEditSuccess = () => {
+    setEditingReservation(null);
+    loadAvailability();
+    loadReservations();
+  };
+
+  const handleApproveReservation = async (id: string) => {
+    try {
+      await reservationsApi.approve(id);
+      loadAvailability();
+      loadReservations();
+    } catch (err: any) {
+      alert(err.message || 'Failed to approve reservation');
+    }
+  };
+
+  const handleRejectReservation = async (id: string) => {
+    if (!confirm('Are you sure you want to reject this reservation?')) {
+      return;
+    }
+
+    try {
+      await reservationsApi.reject(id);
+      loadAvailability();
+      loadReservations();
+    } catch (err: any) {
+      alert(err.message || 'Failed to reject reservation');
     }
   };
 
@@ -218,6 +255,7 @@ export default function Home() {
                 slots={availability}
                 onSlotClick={handleSlotClick}
                 selectedDate={selectedDate}
+                durationMinutes={durationMinutes}
               />
             )}
           </div>
@@ -230,6 +268,9 @@ export default function Home() {
             <ReservationsList
               reservations={reservations}
               onCancel={handleCancelReservation}
+              onEdit={handleEditReservation}
+              onApprove={handleApproveReservation}
+              onReject={handleRejectReservation}
               isLoading={false}
             />
           </div>
@@ -243,6 +284,17 @@ export default function Home() {
             sectorId={selectedSector}
             onSuccess={handleReservationSuccess}
             onCancel={() => setSelectedSlot(null)}
+          />
+        )}
+
+        {/* Edit Reservation Form Modal */}
+        {editingReservation && (
+          <EditReservationForm
+            reservation={editingReservation}
+            availableSlots={availability}
+            sectors={SECTORS}
+            onSuccess={handleEditSuccess}
+            onCancel={() => setEditingReservation(null)}
           />
         )}
       </div>

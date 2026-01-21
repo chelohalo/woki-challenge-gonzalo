@@ -57,7 +57,12 @@ export async function createReservationService(data: {
       restaurant.reservationDurationMinutes || 90
     );
 
-    // 5. Assign table(s) (within lock to prevent race conditions)
+    // 5. Check if this is a large group requiring approval
+    const isLargeGroup = restaurant.largeGroupThreshold !== null && 
+                         restaurant.largeGroupThreshold !== undefined &&
+                         data.partySize >= restaurant.largeGroupThreshold;
+
+    // 6. Assign table(s) (within lock to prevent race conditions)
     const tableIds = await assignTable(
       data.sectorId,
       data.startDateTimeISO,
@@ -68,11 +73,30 @@ export async function createReservationService(data: {
       throw Errors.NO_CAPACITY();
     }
 
-    // 6. Calculate end time
+    // 7. Calculate end time
     const endDate = addMinutesToDate(startDate, reservationDurationMinutes);
     const endDateTimeISO = formatISODateTime(endDate);
 
-    // 7. Create reservation
+    // 8. Determine status and expiration
+    let status: 'CONFIRMED' | 'PENDING' = 'CONFIRMED';
+    let expiresAt: string | null = null;
+
+    if (isLargeGroup && restaurant.pendingHoldTTLMinutes) {
+      status = 'PENDING';
+      // Calculate expiration time
+      const expirationDate = addMinutesToDate(new Date(), restaurant.pendingHoldTTLMinutes);
+      expiresAt = formatISODateTime(expirationDate);
+    }
+
+    // 9. Expire any old pending holds before creating new reservation
+    const { expirePendingHolds } = await import('./pending-holds.service.js');
+    const expiredCount = await expirePendingHolds();
+    if (expiredCount > 0) {
+      // Log expiration for observability
+      // (logger not available here, but could add if needed)
+    }
+
+    // 10. Create reservation
     const now = formatISODateTime(new Date());
     const reservationId = `RES_${nanoid(8).toUpperCase()}`;
 
@@ -84,7 +108,8 @@ export async function createReservationService(data: {
       partySize: data.partySize,
       startDateTime: data.startDateTimeISO,
       endDateTime: endDateTimeISO,
-      status: 'CONFIRMED',
+      status: status,
+      expiresAt: expiresAt,
       customerName: data.customer.name,
       customerPhone: data.customer.phone,
       customerEmail: data.customer.email,
@@ -97,7 +122,7 @@ export async function createReservationService(data: {
       throw new Error('Failed to create reservation');
     }
 
-    // 8. Format response
+    // 11. Format response
     return {
       id: reservation.id,
       restaurantId: reservation.restaurantId,
@@ -107,6 +132,7 @@ export async function createReservationService(data: {
       start: reservation.startDateTime,
       end: reservation.endDateTime,
       status: reservation.status,
+      expiresAt: reservation.expiresAt || undefined,
       customer: {
         name: reservation.customerName,
         phone: reservation.customerPhone,

@@ -83,7 +83,24 @@ export const reservationsApi = {
   }, idempotencyKey?: string) =>
     api.post<import('../types').Reservation>('/reservations', data, idempotencyKey),
 
+  update: (id: string, data: {
+    sectorId?: string;
+    partySize?: number;
+    startDateTimeISO?: string;
+    customer?: {
+      name?: string;
+      phone?: string;
+      email?: string;
+    };
+    notes?: string;
+  }, idempotencyKey?: string) =>
+    api.patch<import('../types').Reservation>(`/reservations/${id}`, data, idempotencyKey),
+
   cancel: (id: string) => api.delete(`/reservations/${id}`),
+
+  approve: (id: string) => api.post(`/reservations/${id}/approve`, {}),
+
+  reject: (id: string) => api.post(`/reservations/${id}/reject`, {}),
 
   getByDay: (restaurantId: string, date: string, sectorId?: string) =>
     api.get<{

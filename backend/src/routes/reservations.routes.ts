@@ -6,6 +6,11 @@ import {
   updateReservationService,
 } from '../services/reservation.service.js';
 import {
+  approvePendingReservation,
+  rejectPendingReservation,
+  expirePendingHolds,
+} from '../services/pending-holds.service.js';
+import {
   createReservationSchema,
   reservationsDayQuerySchema,
   updateReservationSchema,
@@ -302,6 +307,139 @@ export async function reservationsRoutes(fastify: FastifyInstance) {
 
       if (error.name === 'ZodError') {
         throw Errors.INVALID_FORMAT(error.message);
+      }
+      throw new Error('Internal server error');
+    }
+  });
+
+  fastify.post('/reservations/:id/approve', async (request, reply) => {
+    const startTime = Date.now();
+    const requestId = (request as any).requestId || 'unknown';
+    const { id } = request.params as { id: string };
+    
+    try {
+      request.log.info({
+        requestId,
+        reservationId: id,
+        operation: 'approve_reservation',
+      }, 'Approving pending reservation');
+
+      await approvePendingReservation(id);
+      
+      const duration = Date.now() - startTime;
+      request.log.info({
+        requestId,
+        reservationId: id,
+        durationMs: duration,
+        operation: 'approve_reservation',
+        outcome: 'success',
+      }, 'Reservation approved');
+
+      reply.status(200).send({ 
+        message: 'Reservation approved',
+        reservationId: id,
+      });
+    } catch (error: any) {
+      const duration = Date.now() - startTime;
+      request.log.error({
+        requestId,
+        reservationId: id,
+        error: error.message || String(error),
+        durationMs: duration,
+        operation: 'approve_reservation',
+        outcome: 'error',
+      }, 'Failed to approve reservation');
+
+      if (error instanceof Error && 'statusCode' in error) {
+        throw error;
+      }
+      throw new Error('Internal server error');
+    }
+  });
+
+  fastify.post('/reservations/:id/reject', async (request, reply) => {
+    const startTime = Date.now();
+    const requestId = (request as any).requestId || 'unknown';
+    const { id } = request.params as { id: string };
+    
+    try {
+      request.log.info({
+        requestId,
+        reservationId: id,
+        operation: 'reject_reservation',
+      }, 'Rejecting pending reservation');
+
+      await rejectPendingReservation(id);
+      
+      const duration = Date.now() - startTime;
+      request.log.info({
+        requestId,
+        reservationId: id,
+        durationMs: duration,
+        operation: 'reject_reservation',
+        outcome: 'success',
+      }, 'Reservation rejected');
+
+      reply.status(200).send({ 
+        message: 'Reservation rejected',
+        reservationId: id,
+      });
+    } catch (error: any) {
+      const duration = Date.now() - startTime;
+      request.log.error({
+        requestId,
+        reservationId: id,
+        error: error.message || String(error),
+        durationMs: duration,
+        operation: 'reject_reservation',
+        outcome: 'error',
+      }, 'Failed to reject reservation');
+
+      if (error instanceof Error && 'statusCode' in error) {
+        throw error;
+      }
+      throw new Error('Internal server error');
+    }
+  });
+
+  // Endpoint to manually trigger expiration check (useful for testing/admin)
+  fastify.post('/reservations/expire-pending', async (request, reply) => {
+    const startTime = Date.now();
+    const requestId = (request as any).requestId || 'unknown';
+    
+    try {
+      request.log.info({
+        requestId,
+        operation: 'expire_pending_holds',
+      }, 'Expiring pending holds');
+
+      const expiredCount = await expirePendingHolds();
+      
+      const duration = Date.now() - startTime;
+      request.log.info({
+        requestId,
+        expiredCount,
+        durationMs: duration,
+        operation: 'expire_pending_holds',
+        outcome: 'success',
+      }, 'Pending holds expiration completed');
+
+      reply.status(200).send({ 
+        message: 'Expiration check completed',
+        expiredCount,
+      });
+    } catch (error: any) {
+      const duration = Date.now() - startTime;
+      request.log.error({
+        requestId,
+        error: error.message || String(error),
+        durationMs: duration,
+        operation: 'expire_pending_holds',
+        outcome: 'error',
+      }, 'Failed to expire pending holds');
+
+      if (error instanceof Error && 'statusCode' in error) {
+        throw error;
       }
       throw new Error('Internal server error');
     }

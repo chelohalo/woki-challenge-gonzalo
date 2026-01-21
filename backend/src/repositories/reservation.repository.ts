@@ -1,6 +1,6 @@
 import { db } from '../db/index.js';
 import { reservations } from '../db/schema.js';
-import { eq, and, ne } from 'drizzle-orm';
+import { eq, and, ne, or } from 'drizzle-orm';
 import { getZonedDayStartUTC } from '../utils/datetime.js';
 
 export async function getReservationById(id: string) {
@@ -27,11 +27,14 @@ export async function getReservationsByDay(
   const dayEndUTC = new Date(dayStartUTC);
   dayEndUTC.setUTCHours(23, 59, 59, 999);
 
-  // Get all confirmed reservations for the restaurant (and sector if specified)
+  // Get all confirmed and pending reservations (pending holds also block availability)
   // Filter by timestamp in memory to avoid timezone issues with string comparison
   const conditions = [
     eq(reservations.restaurantId, restaurantId),
-    eq(reservations.status, 'CONFIRMED'),
+    or(
+      eq(reservations.status, 'CONFIRMED'),
+      eq(reservations.status, 'PENDING')
+    ),
   ];
 
   if (sectorId) {
@@ -56,9 +59,14 @@ export async function getOverlappingReservations(
   endDateTime: string,
   excludeReservationId?: string
 ) {
-  // Get all confirmed reservations
+  // Get all confirmed and pending reservations (pending holds also block tables)
   // We need to check ALL reservations, not just by date, because overlaps can span days
-  const conditions = [eq(reservations.status, 'CONFIRMED')];
+  const conditions = [
+    or(
+      eq(reservations.status, 'CONFIRMED'),
+      eq(reservations.status, 'PENDING')
+    ),
+  ];
   
   if (excludeReservationId) {
     // Exclude the reservation being updated
@@ -96,6 +104,7 @@ export async function createReservation(data: {
   startDateTime: string;
   endDateTime: string;
   status: 'CONFIRMED' | 'PENDING' | 'CANCELLED';
+  expiresAt?: string | null;
   customerName: string;
   customerPhone: string;
   customerEmail: string;
@@ -122,6 +131,8 @@ export async function updateReservation(
     partySize?: number;
     startDateTime?: string;
     endDateTime?: string;
+    status?: 'CONFIRMED' | 'PENDING' | 'CANCELLED';
+    expiresAt?: string | null;
     customerName?: string;
     customerPhone?: string;
     customerEmail?: string;
@@ -136,6 +147,8 @@ export async function updateReservation(
   if (data.partySize !== undefined) updateData.partySize = data.partySize;
   if (data.startDateTime !== undefined) updateData.startDateTime = data.startDateTime;
   if (data.endDateTime !== undefined) updateData.endDateTime = data.endDateTime;
+  if (data.status !== undefined) updateData.status = data.status;
+  if (data.expiresAt !== undefined) updateData.expiresAt = data.expiresAt;
   if (data.customerName !== undefined) updateData.customerName = data.customerName;
   if (data.customerPhone !== undefined) updateData.customerPhone = data.customerPhone;
   if (data.customerEmail !== undefined) updateData.customerEmail = data.customerEmail;

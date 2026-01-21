@@ -19,7 +19,9 @@ export interface Reservation {
   start: ISODateTime;
   end: ISODateTime;
   status: ReservationStatus;
+  expiresAt?: ISODateTime; // For PENDING holds
   customer: Customer;
+  notes?: string;
   createdAt: ISODateTime;
   updatedAt: ISODateTime;
 }

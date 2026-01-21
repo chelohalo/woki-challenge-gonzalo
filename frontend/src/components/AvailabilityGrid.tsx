@@ -7,9 +7,10 @@ interface AvailabilityGridProps {
   slots: AvailabilitySlot[];
   onSlotClick: (slot: AvailabilitySlot) => void;
   selectedDate: Date;
+  durationMinutes?: number;
 }
 
-export function AvailabilityGrid({ slots, onSlotClick, selectedDate }: AvailabilityGridProps) {
+export function AvailabilityGrid({ slots, onSlotClick, selectedDate, durationMinutes = 90 }: AvailabilityGridProps) {
   // Group slots by shift (morning/evening)
   const morningSlots = slots.filter((slot) => {
     const hour = new Date(slot.start).getUTCHours();

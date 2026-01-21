@@ -1,0 +1,843 @@
+{
+  "info": {
+    "name": "WokiLite API",
+    "description": "Complete API collection for WokiLite Restaurant Reservation System",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "woki-lite"
+  },
+  "item": [
+    {
+      "name": "Health & Metrics",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            },
+            "description": "Check if the API is running and healthy"
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/health",
+                  "host": ["{{base_url}}"],
+                  "path": ["health"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": \"ok\",\n  \"timestamp\": \"2025-01-21T19:50:21-03:00\",\n  \"requestId\": \"req-abcdef1234\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Metrics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/metrics",
+              "host": ["{{base_url}}"],
+              "path": ["metrics"]
+            },
+            "description": "Get application metrics and statistics"
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/metrics",
+                  "host": ["{{base_url}}"],
+                  "path": ["metrics"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"timestamp\": \"2025-01-21T19:50:21-03:00\",\n  \"metrics\": {\n    \"reservationsCreated\": 42,\n    \"reservationsCancelled\": 5,\n    \"reservationsUpdated\": 3,\n    \"conflicts\": 2,\n    \"idempotentHits\": 8,\n    \"availabilityQueries\": 156,\n    \"errors\": 1,\n    \"summary\": {\n      \"total\": 50,\n      \"created\": 42,\n      \"cancelled\": 5,\n      \"updated\": 3,\n      \"conflictRate\": 4.0,\n      \"idempotencyHitRate\": 19.05\n    }\n  },\n  \"requestId\": \"req-abcdef1234\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"user123\",\n  \"password\": \"pass123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Login with hardcoded credentials (user123/pass123)"
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"username\": \"user123\",\n  \"password\": \"pass123\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/auth/login",
+                  "host": ["{{base_url}}"],
+                  "path": ["auth", "login"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"token\": \"dXNlcjEyMzoxNzM3NDk0MjIxMDAw\",\n  \"user\": {\n    \"username\": \"user123\"\n  }\n}"
+            },
+            {
+              "name": "Invalid Credentials",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"username\": \"wrong\",\n  \"password\": \"wrong\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/auth/login",
+                  "host": ["{{base_url}}"],
+                  "path": ["auth", "login"]
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"error\": \"unauthorized\",\n  \"detail\": \"Invalid username or password\",\n  \"requestId\": \"req-abcdef1234\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "logout"]
+            },
+            "description": "Logout (currently just returns success)"
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/auth/logout",
+                  "host": ["{{base_url}}"],
+                  "path": ["auth", "logout"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Logged out successfully\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Availability",
+      "item": [
+        {
+          "name": "Get Availability",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/availability?restaurantId=R1&sectorId=S1&date=2025-01-25&partySize=2",
+              "host": ["{{base_url}}"],
+              "path": ["availability"],
+              "query": [
+                {
+                  "key": "restaurantId",
+                  "value": "R1",
+                  "description": "Restaurant ID"
+                },
+                {
+                  "key": "sectorId",
+                  "value": "S1",
+                  "description": "Sector ID"
+                },
+                {
+                  "key": "date",
+                  "value": "2025-01-25",
+                  "description": "Date in YYYY-MM-DD format"
+                },
+                {
+                  "key": "partySize",
+                  "value": "2",
+                  "description": "Number of guests (1-20)"
+                }
+              ]
+            },
+            "description": "Get available time slots for a restaurant sector on a specific date. Duration varies based on party size if duration rules are configured."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/availability?restaurantId=R1&sectorId=S1&date=2025-01-25&partySize=2",
+                  "host": ["{{base_url}}"],
+                  "path": ["availability"],
+                  "query": [
+                    {
+                      "key": "restaurantId",
+                      "value": "R1"
+                    },
+                    {
+                      "key": "sectorId",
+                      "value": "S1"
+                    },
+                    {
+                      "key": "date",
+                      "value": "2025-01-25"
+                    },
+                    {
+                      "key": "partySize",
+                      "value": "2"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"slotMinutes\": 15,\n  \"durationMinutes\": 75,\n  \"slots\": [\n    {\n      \"start\": \"2025-01-25T12:00:00-03:00\",\n      \"available\": true,\n      \"tables\": [\"T1\", \"T2\"]\n    },\n    {\n      \"start\": \"2025-01-25T12:15:00-03:00\",\n      \"available\": true,\n      \"tables\": [\"T3\", \"T4\"]\n    },\n    {\n      \"start\": \"2025-01-25T12:30:00-03:00\",\n      \"available\": false,\n      \"reason\": \"no_capacity\"\n    }\n  ]\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Reservations",
+      "item": [
+        {
+          "name": "Create Reservation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "res-{{$timestamp}}-{{$randomInt}}",
+                "description": "Optional: Key for idempotent requests"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"restaurantId\": \"R1\",\n  \"sectorId\": \"S1\",\n  \"partySize\": 2,\n  \"startDateTimeISO\": \"2025-01-25T20:00:00-03:00\",\n  \"customer\": {\n    \"name\": \"John Doe\",\n    \"phone\": \"+54 9 11 5555-1234\",\n    \"email\": \"john@example.com\"\n  },\n  \"notes\": \"Window seat preferred\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/reservations",
+              "host": ["{{base_url}}"],
+              "path": ["reservations"]
+            },
+            "description": "Create a new reservation. For large groups (partySize >= largeGroupThreshold), creates a PENDING hold that requires approval."
+          },
+          "response": [
+            {
+              "name": "Created (Small Group)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Idempotency-Key",
+                    "value": "res-1737494221000-12345"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"restaurantId\": \"R1\",\n  \"sectorId\": \"S1\",\n  \"partySize\": 2,\n  \"startDateTimeISO\": \"2025-01-25T20:00:00-03:00\",\n  \"customer\": {\n    \"name\": \"John Doe\",\n    \"phone\": \"+54 9 11 5555-1234\",\n    \"email\": \"john@example.com\"\n  },\n  \"notes\": \"Window seat preferred\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/reservations",
+                  "host": ["{{base_url}}"],
+                  "path": ["reservations"]
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"id\": \"RES_ABC12345\",\n  \"restaurantId\": \"R1\",\n  \"sectorId\": \"S1\",\n  \"tableIds\": [\"T1\"],\n  \"partySize\": 2,\n  \"start\": \"2025-01-25T20:00:00-03:00\",\n  \"end\": \"2025-01-25T21:15:00-03:00\",\n  \"status\": \"CONFIRMED\",\n  \"customer\": {\n    \"name\": \"John Doe\",\n    \"phone\": \"+54 9 11 5555-1234\",\n    \"email\": \"john@example.com\",\n    \"createdAt\": \"2025-01-25T19:50:21-03:00\",\n    \"updatedAt\": \"2025-01-25T19:50:21-03:00\"\n  },\n  \"createdAt\": \"2025-01-25T19:50:21-03:00\",\n  \"updatedAt\": \"2025-01-25T19:50:21-03:00\"\n}"
+            },
+            {
+              "name": "Created (Large Group - PENDING)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"restaurantId\": \"R1\",\n  \"sectorId\": \"S1\",\n  \"partySize\": 10,\n  \"startDateTimeISO\": \"2025-01-25T20:00:00-03:00\",\n  \"customer\": {\n    \"name\": \"Jane Smith\",\n    \"phone\": \"+54 9 11 5555-5678\",\n    \"email\": \"jane@example.com\"\n  },\n  \"notes\": \"Anniversary dinner\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/reservations",
+                  "host": ["{{base_url}}"],
+                  "path": ["reservations"]
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"id\": \"RES_XYZ67890\",\n  \"restaurantId\": \"R1\",\n  \"sectorId\": \"S1\",\n  \"tableIds\": [\"T1\", \"T2\"],\n  \"partySize\": 10,\n  \"start\": \"2025-01-25T20:00:00-03:00\",\n  \"end\": \"2025-01-25T22:30:00-03:00\",\n  \"status\": \"PENDING\",\n  \"expiresAt\": \"2025-01-25T20:50:21-03:00\",\n  \"customer\": {\n    \"name\": \"Jane Smith\",\n    \"phone\": \"+54 9 11 5555-5678\",\n    \"email\": \"jane@example.com\",\n    \"createdAt\": \"2025-01-25T19:50:21-03:00\",\n    \"updatedAt\": \"2025-01-25T19:50:21-03:00\"\n  },\n  \"createdAt\": \"2025-01-25T19:50:21-03:00\",\n  \"updatedAt\": \"2025-01-25T19:50:21-03:00\"\n}"
+            },
+            {
+              "name": "No Capacity",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"restaurantId\": \"R1\",\n  \"sectorId\": \"S1\",\n  \"partySize\": 2,\n  \"startDateTimeISO\": \"2025-01-25T20:00:00-03:00\",\n  \"customer\": {\n    \"name\": \"John Doe\",\n    \"phone\": \"+54 9 11 5555-1234\",\n    \"email\": \"john@example.com\"\n  }\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/reservations",
+                  "host": ["{{base_url}}"],
+                  "path": ["reservations"]
+                }
+              },
+              "status": "Conflict",
+              "code": 409,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"error\": \"no_capacity\",\n  \"detail\": \"No available table fits party size at requested time\",\n  \"requestId\": \"req-abcdef1234\"\n}"
+            },
+            {
+              "name": "Advance Booking Policy Violation",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"restaurantId\": \"R1\",\n  \"sectorId\": \"S1\",\n  \"partySize\": 2,\n  \"startDateTimeISO\": \"2025-01-25T19:00:00-03:00\",\n  \"customer\": {\n    \"name\": \"John Doe\",\n    \"phone\": \"+54 9 11 5555-1234\",\n    \"email\": \"john@example.com\"\n  }\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/reservations",
+                  "host": ["{{base_url}}"],
+                  "path": ["reservations"]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"error\": \"advance_booking_policy_violation\",\n  \"detail\": \"Reservations must be made at least 30 minutes in advance\",\n  \"requestId\": \"req-abcdef1234\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Reservations by Day",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/reservations/day?restaurantId=R1&date=2025-01-25&sectorId=S1",
+              "host": ["{{base_url}}"],
+              "path": ["reservations", "day"],
+              "query": [
+                {
+                  "key": "restaurantId",
+                  "value": "R1",
+                  "description": "Restaurant ID"
+                },
+                {
+                  "key": "date",
+                  "value": "2025-01-25",
+                  "description": "Date in YYYY-MM-DD format"
+                },
+                {
+                  "key": "sectorId",
+                  "value": "S1",
+                  "description": "Optional: Filter by sector"
+                }
+              ]
+            },
+            "description": "Get all reservations for a specific day, optionally filtered by sector"
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/reservations/day?restaurantId=R1&date=2025-01-25&sectorId=S1",
+                  "host": ["{{base_url}}"],
+                  "path": ["reservations", "day"],
+                  "query": [
+                    {
+                      "key": "restaurantId",
+                      "value": "R1"
+                    },
+                    {
+                      "key": "date",
+                      "value": "2025-01-25"
+                    },
+                    {
+                      "key": "sectorId",
+                      "value": "S1"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"date\": \"2025-01-25\",\n  \"items\": [\n    {\n      \"id\": \"RES_ABC12345\",\n      \"restaurantId\": \"R1\",\n      \"sectorId\": \"S1\",\n      \"tableIds\": [\"T1\"],\n      \"partySize\": 2,\n      \"start\": \"2025-01-25T20:00:00-03:00\",\n      \"end\": \"2025-01-25T21:15:00-03:00\",\n      \"status\": \"CONFIRMED\",\n      \"customer\": {\n        \"name\": \"John Doe\",\n        \"phone\": \"+54 9 11 5555-1234\",\n        \"email\": \"john@example.com\",\n        \"createdAt\": \"2025-01-25T19:50:21-03:00\",\n        \"updatedAt\": \"2025-01-25T19:50:21-03:00\"\n      },\n      \"createdAt\": \"2025-01-25T19:50:21-03:00\",\n      \"updatedAt\": \"2025-01-25T19:50:21-03:00\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Reservation",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "edit-{{reservation_id}}-{{$timestamp}}",
+                "description": "Optional: Key for idempotent requests"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sectorId\": \"S2\",\n  \"partySize\": 4,\n  \"startDateTimeISO\": \"2025-01-25T21:00:00-03:00\",\n  \"customer\": {\n    \"name\": \"John Doe Updated\",\n    \"phone\": \"+54 9 11 9999-8888\",\n    \"email\": \"john.updated@example.com\"\n  },\n  \"notes\": \"Updated notes for anniversary\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/reservations/:id",
+              "host": ["{{base_url}}"],
+              "path": ["reservations", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "RES_ABC12345",
+                  "description": "Reservation ID"
+                }
+              ]
+            },
+            "description": "Update an existing reservation. All fields are optional. If sectorId, startDateTimeISO, or partySize changes, tables will be re-assigned."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Idempotency-Key",
+                    "value": "edit-RES_ABC12345-1737494221000"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"sectorId\": \"S2\",\n  \"partySize\": 4,\n  \"startDateTimeISO\": \"2025-01-25T21:00:00-03:00\",\n  \"customer\": {\n    \"name\": \"John Doe Updated\",\n    \"phone\": \"+54 9 11 9999-8888\",\n    \"email\": \"john.updated@example.com\"\n  },\n  \"notes\": \"Updated notes for anniversary\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/reservations/RES_ABC12345",
+                  "host": ["{{base_url}}"],
+                  "path": ["reservations", "RES_ABC12345"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"id\": \"RES_ABC12345\",\n  \"restaurantId\": \"R1\",\n  \"sectorId\": \"S2\",\n  \"tableIds\": [\"T5\"],\n  \"partySize\": 4,\n  \"start\": \"2025-01-25T21:00:00-03:00\",\n  \"end\": \"2025-01-25T22:30:00-03:00\",\n  \"status\": \"CONFIRMED\",\n  \"customer\": {\n    \"name\": \"John Doe Updated\",\n    \"phone\": \"+54 9 11 9999-8888\",\n    \"email\": \"john.updated@example.com\",\n    \"createdAt\": \"2025-01-25T19:50:21-03:00\",\n    \"updatedAt\": \"2025-01-25T20:15:30-03:00\"\n  },\n  \"createdAt\": \"2025-01-25T19:50:21-03:00\",\n  \"updatedAt\": \"2025-01-25T20:15:30-03:00\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Cancel Reservation",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/reservations/:id",
+              "host": ["{{base_url}}"],
+              "path": ["reservations", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "RES_ABC12345",
+                  "description": "Reservation ID"
+                }
+              ]
+            },
+            "description": "Cancel a reservation by ID"
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/reservations/RES_ABC12345",
+                  "host": ["{{base_url}}"],
+                  "path": ["reservations", "RES_ABC12345"]
+                }
+              },
+              "status": "No Content",
+              "code": 204,
+              "header": []
+            }
+          ]
+        },
+        {
+          "name": "Approve Pending Reservation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{base_url}}/reservations/:id/approve",
+              "host": ["{{base_url}}"],
+              "path": ["reservations", ":id", "approve"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "RES_XYZ67890",
+                  "description": "Reservation ID (must be PENDING)"
+                }
+              ]
+            },
+            "description": "Approve a pending reservation (large group hold). Changes status from PENDING to CONFIRMED."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": ""
+                },
+                "url": {
+                  "raw": "{{base_url}}/reservations/RES_XYZ67890/approve",
+                  "host": ["{{base_url}}"],
+                  "path": ["reservations", "RES_XYZ67890", "approve"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Reservation approved\",\n  \"reservationId\": \"RES_XYZ67890\"\n}"
+            },
+            {
+              "name": "Not Pending",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": ""
+                },
+                "url": {
+                  "raw": "{{base_url}}/reservations/RES_ABC12345/approve",
+                  "host": ["{{base_url}}"],
+                  "path": ["reservations", "RES_ABC12345", "approve"]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"error\": \"invalid_format\",\n  \"detail\": \"Reservation is not pending approval\",\n  \"requestId\": \"req-abcdef1234\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Reject Pending Reservation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{base_url}}/reservations/:id/reject",
+              "host": ["{{base_url}}"],
+              "path": ["reservations", ":id", "reject"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "RES_XYZ67890",
+                  "description": "Reservation ID (must be PENDING)"
+                }
+              ]
+            },
+            "description": "Reject a pending reservation (large group hold). Changes status from PENDING to CANCELLED and releases tables."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": ""
+                },
+                "url": {
+                  "raw": "{{base_url}}/reservations/RES_XYZ67890/reject",
+                  "host": ["{{base_url}}"],
+                  "path": ["reservations", "RES_XYZ67890", "reject"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Reservation rejected\",\n  \"reservationId\": \"RES_XYZ67890\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Expire Pending Holds",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/reservations/expire-pending",
+              "host": ["{{base_url}}"],
+              "path": ["reservations", "expire-pending"]
+            },
+            "description": "Manually trigger expiration check for pending holds. Expires holds that have passed their TTL. Useful for testing/admin."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/reservations/expire-pending",
+                  "host": ["{{base_url}}"],
+                  "path": ["reservations", "expire-pending"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"message\": \"Expiration check completed\",\n  \"expiredCount\": 2\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3001",
+      "type": "string",
+      "description": "Base URL for the API. Change to production URL when deploying."
+    },
+    {
+      "key": "reservation_id",
+      "value": "RES_ABC12345",
+      "type": "string",
+      "description": "Example reservation ID for testing update/approve/reject endpoints"
+    }
+  ]
+}
