@@ -25,4 +25,7 @@ export const Errors = {
   
   CONFLICT: (message: string, detail?: string) =>
     new AppError(409, 'conflict', message, detail),
+  
+  UNAUTHORIZED: (detail?: string) =>
+    new AppError(401, 'unauthorized', 'Unauthorized', detail),
 };

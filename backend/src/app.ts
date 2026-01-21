@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import { env } from './config/env.js';
 import { availabilityRoutes } from './routes/availability.routes.js';
 import { reservationsRoutes } from './routes/reservations.routes.js';
+import { authRoutes } from './routes/auth.routes.js';
 import { Errors } from './utils/errors.js';
 
 const app = Fastify({
@@ -42,6 +43,7 @@ app.get('/health', async () => {
 });
 
 // Register routes
+app.register(authRoutes);
 app.register(availabilityRoutes);
 app.register(reservationsRoutes);
 

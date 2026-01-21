@@ -6,10 +6,13 @@ import { AvailabilityGrid } from '../src/components/AvailabilityGrid';
 import { ReservationForm } from '../src/components/ReservationForm';
 import { ReservationsList } from '../src/components/ReservationsList';
 import { ThemeToggle } from '../src/components/ThemeToggle';
+import { Login } from '../src/components/Login';
 import { Spinner } from '../src/components/Spinner';
 import { useApiLoading } from '../src/hooks/useApiLoading';
 import { availabilityApi, reservationsApi } from '../src/lib/api';
 import type { AvailabilitySlot, Reservation } from '../src/types';
+
+const AUTH_TOKEN_KEY = 'woki_auth_token';
 
 // Hardcoded for demo - in production these would come from context/config
 const RESTAURANT_ID = 'R1';
@@ -19,6 +22,7 @@ const SECTORS = [
 ];
 
 export default function Home() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedSector, setSelectedSector] = useState(SECTORS[0].id);
   const [partySize, setPartySize] = useState(2);
@@ -28,6 +32,29 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isApiLoading = useApiLoading();
+
+  // Check authentication on mount
+  useEffect(() => {
+    const token = localStorage.getItem(AUTH_TOKEN_KEY);
+    if (token) {
+      setIsAuthenticated(true);
+    }
+  }, []);
+
+  const handleLogin = (token: string) => {
+    localStorage.setItem(AUTH_TOKEN_KEY, token);
+    setIsAuthenticated(true);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+    setIsAuthenticated(false);
+  };
+
+  // Show login if not authenticated
+  if (!isAuthenticated) {
+    return <Login onLogin={handleLogin} />;
+  }
 
   const dateString = format(selectedDate, 'yyyy-MM-dd');
 
@@ -96,9 +123,17 @@ export default function Home() {
       <ThemeToggle />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">WokiLite - Restaurant Reservations</h1>
-          <p className="text-gray-600 dark:text-gray-400">Bistro Central - Make a reservation</p>
+        <div className="mb-8 flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">WokiLite - Restaurant Reservations</h1>
+            <p className="text-gray-600 dark:text-gray-400">Bistro Central - Make a reservation</p>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          >
+            Logout
+          </button>
         </div>
 
         {/* Controls */}
