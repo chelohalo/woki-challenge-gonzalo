@@ -1,110 +1,102 @@
 /**
- * In-memory lock manager for concurrency control
- * Prevents double-booking by locking sector+slot combinations
+ * Distributed lock manager using Redis.
+ * Locks per 15-minute slot in [start, end) to prevent overlapping reservations.
  */
 
-import { Mutex } from 'async-mutex';
-import { Errors } from './errors.js';
+import { nanoid } from 'nanoid';
+import { getRedis } from './redis.js';
+import { addMinutesToDate, formatISODateTime } from './datetime.js';
+import { Errors, AppError } from './errors.js';
 
-// Map of mutexes per sector+slot combination
-const mutexes = new Map<string, Mutex>();
+const SLOT_MINUTES = 15;
+const DEFAULT_TTL_MS = 30_000; // 30 seconds
 
-// Track last access time for cleanup
-const lastAccess = new Map<string, number>();
+export interface AcquireReservationLocksOptions {
+  sectorId: string;
+  startISO: string;
+  endISO: string;
+  ttlMs?: number;
+}
 
-// Cleanup interval: remove unused mutexes older than 1 hour
-const CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
-const MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
+/**
+ * Generate 15-minute slot ISO strings (canonical UTC) for the interval [startISO, endISO) (end exclusive).
+ */
+function get15MinSlotsInRange(startISO: string, endISO: string): string[] {
+  const start = new Date(startISO);
+  const end = new Date(endISO);
+  const slots: string[] = [];
+  let current = new Date(start.getTime());
+  while (current.getTime() < end.getTime()) {
+    slots.push(formatISODateTime(current));
+    current = addMinutesToDate(current, SLOT_MINUTES);
+  }
+  return slots;
+}
 
-// Start cleanup interval
-let cleanupInterval: NodeJS.Timeout | null = null;
+/**
+ * Build Redis key for a sector+slot: lock:sector:{sectorId}:slot:{slotISO}
+ */
+function lockKey(sectorId: string, slotISO: string): string {
+  return `lock:sector:${sectorId}:slot:${slotISO}`;
+}
 
-function startCleanupInterval() {
-  if (cleanupInterval) return; // Already started
+/**
+ * Lua script: delete key only if its value equals token (safe release).
+ */
+const RELEASE_SCRIPT = `
+  if redis.call('GET', KEYS[1]) == ARGV[1] then
+    return redis.call('DEL', KEYS[1])
+  else
+    return 0
+  end
+`;
 
-  cleanupInterval = setInterval(() => {
-    const now = Date.now();
-    const keysToDelete: string[] = [];
+/**
+ * Acquire distributed locks for every 15-minute slot in [startISO, endISO).
+ * Keys are acquired in stable (sorted) order. If any key is already held, all already-acquired keys are released and NO_CAPACITY is thrown (fail-fast).
+ *
+ * @returns A release function that must be called (and awaited) to free all locks. Release is safe: only deletes if token matches.
+ */
+export async function acquireReservationLocks(options: AcquireReservationLocksOptions): Promise<() => Promise<void>> {
+  const { sectorId, startISO, endISO, ttlMs = DEFAULT_TTL_MS } = options;
+  const redis = getRedis();
 
-    for (const [key, lastUsed] of lastAccess.entries()) {
-      if (now - lastUsed > MAX_AGE_MS) {
-        const mutex = mutexes.get(key);
-        // Only delete if mutex is not locked and not in use
-        if (mutex && !mutex.isLocked()) {
-          keysToDelete.push(key);
+  const slotISOs = get15MinSlotsInRange(startISO, endISO);
+  if (slotISOs.length === 0) {
+    return async () => { };
+  }
+
+  const keys = slotISOs
+    .map((slotISO) => lockKey(sectorId, slotISO))
+    .sort(); // stable order for all callers
+
+  const token = nanoid();
+  const acquired: string[] = [];
+
+  try {
+    for (const key of keys) {
+      const result = await redis.set(key, token, 'PX', ttlMs, 'NX');
+      if (result !== 'OK') {
+        // Fail-fast: release what we already acquired
+        for (const k of acquired) {
+          await redis.eval(RELEASE_SCRIPT, 1, k, token);
         }
+        throw Errors.NO_CAPACITY('Lock busy - another reservation is being processed for this slot');
       }
+      acquired.push(key);
     }
-
-    // Delete unused mutexes
-    for (const key of keysToDelete) {
-      mutexes.delete(key);
-      lastAccess.delete(key);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    // Redis errors: release acquired keys before rethrowing
+    for (const k of acquired) {
+      await redis.eval(RELEASE_SCRIPT, 1, k, token).catch(() => { });
     }
-
-    if (keysToDelete.length > 0) {
-      // Log cleanup for observability (optional, can be removed if too verbose)
-      // console.log(`Cleaned up ${keysToDelete.length} unused locks`);
-    }
-  }, CLEANUP_INTERVAL_MS);
-}
-
-/**
- * Generate lock key from sector and slot
- */
-function getLockKey(sectorId: string, startDateTimeISO: string): string {
-  return `${sectorId}:${startDateTimeISO}`;
-}
-
-/**
- * Acquire a lock for a sector+slot combination
- * Returns a release function that must be called to free the lock
- * Throws NO_CAPACITY if lock is already taken (fail-fast for concurrency)
- */
-export async function acquireLock(
-  sectorId: string,
-  startDateTimeISO: string
-): Promise<() => void> {
-  const key = getLockKey(sectorId, startDateTimeISO);
-
-  // Start cleanup interval on first use
-  startCleanupInterval();
-
-  // Get or create mutex for this key
-  let mutex = mutexes.get(key);
-  if (!mutex) {
-    mutex = new Mutex();
-    mutexes.set(key, mutex);
+    throw err;
   }
 
-  // Fail-fast: if lock is already taken, throw immediately
-  if (mutex.isLocked()) {
-    throw Errors.NO_CAPACITY('Lock busy - another reservation is being processed for this slot');
-  }
-
-  // Acquire lock
-  const release = await mutex.acquire();
-
-  // Update last access time
-  lastAccess.set(key, Date.now());
-
-  // Return release function
-  return () => {
-    release();
-    // Update last access time when released
-    lastAccess.set(key, Date.now());
-  };
-}
-
-/**
- * Get current lock statistics (useful for debugging/monitoring)
- */
-export function getLockStats() {
-  return {
-    totalLocks: mutexes.size,
-    lockedCount: Array.from(mutexes.values()).filter(m => m.isLocked()).length,
-    oldestLock: lastAccess.size > 0
-      ? Math.min(...Array.from(lastAccess.values()))
-      : null,
+  return async function release(): Promise<void> {
+    for (const key of acquired) {
+      await redis.eval(RELEASE_SCRIPT, 1, key, token).catch(() => { });
+    }
   };
 }

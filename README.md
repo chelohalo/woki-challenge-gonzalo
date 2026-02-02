@@ -8,7 +8,7 @@ A lean, high-signal prototype of Woki's reservation engine focused on atomic, ef
 - **Frontend**: Next.js 14 + React + Tailwind CSS
 - **Database**: Turso (separate databases for dev/prod)
 - **Key Features**:
-  - Atomic table assignment with in-memory locks
+  - Atomic table assignment with **Redis distributed locks** (per 15-min slot in [start, end))
   - Idempotent operations via `Idempotency-Key` header
   - Configurable reservation duration by party size
   - Advance booking policy enforcement
@@ -32,6 +32,7 @@ woki-challenge-gonzalo/
 - Node.js >= 20.9.0
 - npm or yarn
 - Turso account and databases (dev + prod)
+- **Redis** (for distributed locking; see below)
 
 ### Backend Setup
 
@@ -39,15 +40,26 @@ woki-challenge-gonzalo/
 cd backend
 npm install
 cp .env.example .env
-# Edit .env with your Turso credentials
+# Edit .env with your Turso credentials and REDIS_URL (optional, defaults to redis://localhost:6379)
 
 # Generate and run migrations
 npm run db:generate
 npm run db:push
 
-# Start dev server
+# Start dev server (ensure Redis is running locally or set REDIS_URL)
 npm run dev
 ```
+
+#### Redis (distributed lock)
+
+Concurrency is enforced with **Redis distributed locks**: one lock per 15-minute slot in the reservation interval `[start, end)` (end exclusive). This prevents overlapping reservations (e.g. 20:00 and 20:15 in the same sector) from both succeeding.
+
+- **Configure:** Set `REDIS_URL` in `.env`. Default: `redis://localhost:6379`.
+- **Run Redis locally (Docker):**
+  ```bash
+  docker run -d --name redis -p 6379:6379 redis:7-alpine
+  ```
+- **Tests:** The test suite (including concurrency and overlapping-slot tests) requires a running Redis instance. Use the same Docker command above, or point `REDIS_URL` to your Redis.
 
 ### Frontend Setup
 
@@ -69,6 +81,7 @@ npm test
 ```
 
 The test suite includes:
+
 - Happy path scenarios
 - Concurrency handling (double-booking prevention)
 - Idempotency validation
@@ -82,15 +95,18 @@ The test suite includes:
 ### Endpoints
 
 #### GET `/availability`
+
 Get available time slots for a restaurant sector on a specific date.
 
 **Query Parameters:**
+
 - `restaurantId` (string, required): Restaurant ID
 - `sectorId` (string, required): Sector ID
 - `date` (string, required): Date in YYYY-MM-DD format
 - `partySize` (number, required): Number of guests (1-20)
 
 **Response:**
+
 ```json
 {
   "slotMinutes": 15,
@@ -110,21 +126,25 @@ Get available time slots for a restaurant sector on a specific date.
 }
 ```
 
-**Note:** 
+**Note:**
+
 - `durationMinutes` varies based on party size if duration rules are configured:
   - ≤2 guests → 75 minutes
   - ≤4 guests → 90 minutes
   - ≤8 guests → 120 minutes
-  - >8 guests → 150 minutes
+  - > 8 guests → 150 minutes
 - `tables` array may contain multiple table IDs if a combination is needed (when no single table fits the party size)
 
 #### POST `/reservations`
+
 Create a new reservation.
 
 **Headers:**
+
 - `idempotency-key` (optional): Key for idempotent requests
 
 **Body:**
+
 ```json
 {
   "restaurantId": "R1",
@@ -144,6 +164,7 @@ Create a new reservation.
 Returns the created reservation with assigned table(s) and calculated end time.
 
 **Response example:**
+
 ```json
 {
   "id": "RES_001",
@@ -163,34 +184,50 @@ Returns the created reservation with assigned table(s) and calculated end time.
 **Note:** `tableIds` may contain multiple tables if no single table can accommodate the party size. The system automatically finds the best combination (minimizing number of tables and wasted capacity).
 
 **400 Bad Request**
+
 ```json
-{ "error": "invalid_format", "detail": "Reservations must be made at least 30 minutes in advance" }
+{
+  "error": "invalid_format",
+  "detail": "Reservations must be made at least 30 minutes in advance"
+}
 ```
 
 **409 Conflict**
+
 ```json
-{ "error": "no_capacity", "detail": "No available table fits party size at requested time" }
+{
+  "error": "no_capacity",
+  "detail": "No available table fits party size at requested time"
+}
 ```
 
 **422 Unprocessable Entity**
+
 ```json
-{ "error": "outside_service_window", "detail": "Requested time is outside shifts" }
+{
+  "error": "outside_service_window",
+  "detail": "Requested time is outside shifts"
+}
 ```
 
 **Note:** The system validates:
+
 - Advance booking policy (min/max advance time if configured)
 - Reservation duration is calculated based on party size
 - Time must be within restaurant shifts
 
 #### GET `/reservations/day`
+
 Get all reservations for a specific day.
 
 **Query Parameters:**
+
 - `restaurantId` (string, required): Restaurant ID
 - `date` (string, required): Date in YYYY-MM-DD format
 - `sectorId` (string, optional): Filter by sector (if omitted, returns all sectors)
 
 **200 OK**
+
 ```json
 {
   "date": "2025-09-08",
@@ -216,6 +253,7 @@ Get all reservations for a specific day.
 ```
 
 #### DELETE `/reservations/:id`
+
 Cancel a reservation by ID.
 
 **204 No Content**
@@ -223,9 +261,11 @@ Cancel a reservation by ID.
 ---
 
 #### GET `/health`
+
 Health check endpoint.
 
 **200 OK**
+
 ```json
 {
   "status": "ok",
@@ -236,9 +276,11 @@ Health check endpoint.
 ---
 
 #### GET `/metrics`
+
 Get application metrics and statistics.
 
 **200 OK**
+
 ```json
 {
   "timestamp": "2025-09-08T19:50:21-03:00",
@@ -265,12 +307,15 @@ Get application metrics and statistics.
 ---
 
 #### PATCH `/reservations/:id`
+
 Update an existing reservation.
 
 **Headers:**
+
 - `idempotency-key` (optional): Key for idempotent requests
 
 **Body (all fields optional):**
+
 ```json
 {
   "sectorId": "S2",
@@ -289,21 +334,34 @@ Update an existing reservation.
 Returns the updated reservation (same format as POST response).
 
 **409 Conflict**
+
 ```json
-{ "error": "no_capacity", "detail": "No available table for the updated reservation parameters" }
+{
+  "error": "no_capacity",
+  "detail": "No available table for the updated reservation parameters"
+}
 ```
 
 **400 Bad Request**
+
 ```json
-{ "error": "invalid_format", "detail": "Reservations must be made at least 30 minutes in advance" }
+{
+  "error": "invalid_format",
+  "detail": "Reservations must be made at least 30 minutes in advance"
+}
 ```
 
 **422 Unprocessable Entity**
+
 ```json
-{ "error": "outside_service_window", "detail": "Requested time is outside shifts" }
+{
+  "error": "outside_service_window",
+  "detail": "Requested time is outside shifts"
+}
 ```
 
 **Note:** When updating a reservation:
+
 - If `sectorId`, `startDateTimeISO`, or `partySize` changes, the system will re-assign tables
 - All validations (shifts, advance booking policy) are re-applied
 - The reservation duration is recalculated based on the new party size
@@ -315,7 +373,7 @@ Returns the updated reservation (same format as POST response).
 - [x] Table assignment algorithm (Best Fit Decreasing strategy with table combinations)
 - [x] Reservation CRUD (Create, Read, Cancel)
 - [x] Idempotency support (via `Idempotency-Key` header)
-- [x] Concurrency handling (in-memory locks with fail-fast)
+- [x] Concurrency handling (Redis distributed locks per 15-min slot, fail-fast)
 - [x] Configurable reservation duration per restaurant
 
 ## 🎁 Bonus Features
@@ -336,6 +394,7 @@ Returns the updated reservation (same format as POST response).
 For party sizes equal to or greater than the restaurant's `largeGroupThreshold` (default: 8), reservations are created with `PENDING` status and require manual approval.
 
 **Workflow:**
+
 1. Customer creates a reservation for 8+ guests
 2. System creates a `PENDING` reservation with an `expiresAt` timestamp (TTL: `pendingHoldTTLMinutes`, default: 30 minutes)
 3. Restaurant staff can:
@@ -344,15 +403,18 @@ For party sizes equal to or greater than the restaurant's `largeGroupThreshold` 
 4. If not approved/rejected within TTL, the reservation automatically expires (status → `CANCELLED`)
 
 **API Endpoints:**
+
 - `POST /reservations/:id/approve` - Approve a pending reservation
 - `POST /reservations/:id/reject` - Reject a pending reservation
 - `POST /reservations/expire-pending` - Manually expire pending holds (also runs automatically before new reservations)
 
 **Configuration:**
+
 - `largeGroupThreshold`: Party size that triggers approval flow (default: 8)
 - `pendingHoldTTLMinutes`: Time-to-live for pending holds in minutes (default: 30)
 
 **Example:**
+
 ```json
 POST /reservations
 {
@@ -377,6 +439,7 @@ Response:
 ### Backend Deployment (Railway)
 
 1. **Create Railway Account & Project**
+
    - Go to [railway.app](https://railway.app)
    - Sign up/login and create a new project
    - Select "Deploy from GitHub repo" and connect your repository
@@ -384,6 +447,7 @@ Response:
 
 2. **Configure Environment Variables**
    Add these variables in Railway dashboard:
+
    ```
    DATABASE_URL=libsql://your-database-url.turso.io
    TURSO_AUTH_TOKEN=your-turso-auth-token
@@ -401,6 +465,7 @@ Response:
 ### Frontend Deployment (Vercel)
 
 1. **Create Vercel Account & Project**
+
    - Go to [vercel.com](https://vercel.com)
    - Sign up/login and click "Add New Project"
    - Import your GitHub repository
@@ -408,11 +473,13 @@ Response:
 
 2. **Configure Environment Variables**
    Add this variable in Vercel dashboard:
+
    ```
    NEXT_PUBLIC_API_URL=https://your-backend.railway.app
    ```
 
 3. **Deploy**
+
    - Click "Deploy"
    - Vercel will automatically build and deploy your Next.js app
    - Copy the generated URL (e.g., `https://your-app.vercel.app`)
@@ -425,6 +492,7 @@ Response:
 ### Database Setup (Turso)
 
 1. **Create Production Database**
+
    - Go to [turso.tech](https://turso.tech)
    - Create a new database for production
    - Copy the database URL and auth token
@@ -452,6 +520,7 @@ Response:
 Restaurants can be configured with the following optional settings:
 
 **Duration Rules** (`durationRules`): Define reservation duration based on party size
+
 ```json
 {
   "durationRules": [
@@ -464,12 +533,14 @@ Restaurants can be configured with the following optional settings:
 ```
 
 **Advance Booking Policy**:
+
 - `minAdvanceMinutes`: Minimum minutes in advance (e.g., 30)
 - `maxAdvanceDays`: Maximum days in advance (e.g., 30)
 
 If not set, these validations are skipped.
 
 **Shifts**: Define service windows
+
 ```json
 {
   "shifts": [
@@ -492,6 +563,7 @@ The system uses a **Best Fit Decreasing** strategy for table assignment:
    - Minimize wasted capacity (prefer tables with `maxSize` closest to `partySize`)
 
 **Example:**
+
 - Party size: 8 guests
 - Available tables: T1 (maxSize=4), T2 (maxSize=4), T3 (maxSize=3), T4 (maxSize=3)
 - Result: Assigns T1 + T2 (total maxSize=8, perfect fit) or T3 + T4 + T1 (if T1+T2 unavailable)
@@ -504,13 +576,14 @@ The application uses **structured logging** with Pino:
 
 - **Request Tracing**: Each request gets a unique `requestId` (provided via `X-Request-Id` header or auto-generated)
 - **Structured Logs**: All logs include context (requestId, operation, outcome, durationMs)
-- **Log Levels**: 
+- **Log Levels**:
   - `debug`: Detailed information (development only)
   - `info`: Normal operations
   - `warn`: Expected errors (4xx)
   - `error`: Unexpected errors (5xx)
 
 **Example log entry:**
+
 ```json
 {
   "level": 30,

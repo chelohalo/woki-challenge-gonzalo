@@ -10,7 +10,7 @@ import {
 import { addMinutesToDate, formatISODateTime, isWithinShift } from '../utils/datetime.js';
 import { calculateReservationDuration } from '../utils/duration.js';
 import { validateAdvanceBooking } from '../utils/booking-policy.js';
-import { acquireLock } from '../utils/locks.js';
+import { acquireReservationLocks } from '../utils/locks.js';
 import { Errors } from '../utils/errors.js';
 import type { CustomerInput } from '../types/index.js';
 
@@ -22,47 +22,53 @@ export async function createReservationService(data: {
   customer: CustomerInput;
   notes?: string;
 }) {
-  // Acquire lock for this sector+slot to prevent concurrent bookings
-  const releaseLock = await acquireLock(data.sectorId, data.startDateTimeISO);
+  // 1. Validate restaurant and sector exist
+  const restaurant = await getRestaurantById(data.restaurantId);
+  if (!restaurant) {
+    throw Errors.NOT_FOUND('Restaurant');
+  }
+
+  const sector = await getSectorById(data.sectorId);
+  if (!sector) {
+    throw Errors.NOT_FOUND('Sector');
+  }
+
+  // 2. Validate time is within shifts
+  const startDate = new Date(data.startDateTimeISO);
+  if (!isWithinShift(startDate, restaurant.timezone, restaurant.shifts || undefined)) {
+    throw Errors.OUTSIDE_SERVICE_WINDOW();
+  }
+
+  // 3. Validate advance booking policy
+  validateAdvanceBooking(
+    data.startDateTimeISO,
+    restaurant.minAdvanceMinutes ?? undefined,
+    restaurant.maxAdvanceDays ?? undefined
+  );
+
+  // 4. Calculate reservation duration and end time (for lock range)
+  const reservationDurationMinutes = calculateReservationDuration(
+    data.partySize,
+    restaurant.durationRules || undefined,
+    restaurant.reservationDurationMinutes || 90
+  );
+  const endDate = addMinutesToDate(startDate, reservationDurationMinutes);
+  const endDateTimeISO = formatISODateTime(endDate);
+
+  // 5. Acquire distributed locks for every 15-min slot in [start, end)
+  const releaseLock = await acquireReservationLocks({
+    sectorId: data.sectorId,
+    startISO: data.startDateTimeISO,
+    endISO: endDateTimeISO,
+  });
 
   try {
-    // 1. Validate restaurant and sector exist
-    const restaurant = await getRestaurantById(data.restaurantId);
-    if (!restaurant) {
-      throw Errors.NOT_FOUND('Restaurant');
-    }
+    // 6. Check if this is a large group requiring approval
+    const isLargeGroup = restaurant.largeGroupThreshold !== null &&
+      restaurant.largeGroupThreshold !== undefined &&
+      data.partySize >= restaurant.largeGroupThreshold;
 
-    const sector = await getSectorById(data.sectorId);
-    if (!sector) {
-      throw Errors.NOT_FOUND('Sector');
-    }
-
-    // 2. Validate time is within shifts
-    const startDate = new Date(data.startDateTimeISO);
-    if (!isWithinShift(startDate, restaurant.timezone, restaurant.shifts || undefined)) {
-      throw Errors.OUTSIDE_SERVICE_WINDOW();
-    }
-
-    // 3. Validate advance booking policy
-    validateAdvanceBooking(
-      data.startDateTimeISO,
-      restaurant.minAdvanceMinutes ?? undefined,
-      restaurant.maxAdvanceDays ?? undefined
-    );
-
-    // 4. Calculate reservation duration based on party size and rules
-    const reservationDurationMinutes = calculateReservationDuration(
-      data.partySize,
-      restaurant.durationRules || undefined,
-      restaurant.reservationDurationMinutes || 90
-    );
-
-    // 5. Check if this is a large group requiring approval
-    const isLargeGroup = restaurant.largeGroupThreshold !== null && 
-                         restaurant.largeGroupThreshold !== undefined &&
-                         data.partySize >= restaurant.largeGroupThreshold;
-
-    // 6. Assign table(s) (within lock to prevent race conditions)
+    // 7. Assign table(s) (within lock to prevent race conditions)
     const tableIds = await assignTable(
       data.sectorId,
       data.startDateTimeISO,
@@ -72,10 +78,6 @@ export async function createReservationService(data: {
     if (!tableIds || tableIds.length === 0) {
       throw Errors.NO_CAPACITY();
     }
-
-    // 7. Calculate end time
-    const endDate = addMinutesToDate(startDate, reservationDurationMinutes);
-    const endDateTimeISO = formatISODateTime(endDate);
 
     // 8. Determine status and expiration
     let status: 'CONFIRMED' | 'PENDING' = 'CONFIRMED';
@@ -145,7 +147,7 @@ export async function createReservationService(data: {
     };
   } finally {
     // Always release lock, even if there's an error
-    releaseLock();
+    await releaseLock();
   }
 }
 
@@ -258,23 +260,30 @@ export async function updateReservationService(
     );
   }
 
-  // Calculate new duration based on party size
+  // Calculate new duration and end time (for lock range)
   const reservationDurationMinutes = calculateReservationDuration(
     newPartySize,
     restaurant.durationRules || undefined,
     restaurant.reservationDurationMinutes || 90
   );
+  const newStartDate = new Date(newStartDateTimeISO);
+  const newEndDate = addMinutesToDate(newStartDate, reservationDurationMinutes);
+  const newEndDateTimeISO = formatISODateTime(newEndDate);
 
-  // Acquire lock for the new slot (or existing if time didn't change)
-  const releaseLock = await acquireLock(newSectorId, newStartDateTimeISO);
+  // Acquire distributed locks for every 15-min slot in [start, end)
+  const releaseLock = await acquireReservationLocks({
+    sectorId: newSectorId,
+    startISO: newStartDateTimeISO,
+    endISO: newEndDateTimeISO,
+  });
 
   try {
     // If time or sector changed, need to re-assign table
     let newTableIds = existingReservation.tableIds;
-    
+
     if (data.startDateTimeISO || data.sectorId || data.partySize !== undefined) {
       // Release old table assignment by checking if we need to reassign
-      const needsReassignment = 
+      const needsReassignment =
         data.startDateTimeISO !== undefined ||
         data.sectorId !== undefined ||
         (data.partySize !== undefined && data.partySize !== existingReservation.partySize);
@@ -288,30 +297,25 @@ export async function updateReservationService(
           reservationDurationMinutes,
           id // Exclude current reservation
         );
-        
+
         if (!assignedTableIds || assignedTableIds.length === 0) {
           throw Errors.NO_CAPACITY('No available table(s) for the updated reservation parameters');
         }
-        
+
         newTableIds = assignedTableIds;
       }
     }
 
-    // Calculate new end time
-    const startDate = new Date(newStartDateTimeISO);
-    const endDate = addMinutesToDate(startDate, reservationDurationMinutes);
-    const endDateTimeISO = formatISODateTime(endDate);
-
-    // Update reservation
+    // Update reservation (end already computed above)
     const { updateReservation } = await import('../repositories/reservation.repository.js');
     const now = formatISODateTime(new Date());
-    
+
     await updateReservation(id, {
       sectorId: newSectorId,
       tableIds: newTableIds,
       partySize: newPartySize,
       startDateTime: newStartDateTimeISO,
-      endDateTime: endDateTimeISO,
+      endDateTime: newEndDateTimeISO,
       customerName: newCustomer.name,
       customerPhone: newCustomer.phone,
       customerEmail: newCustomer.email,
@@ -345,6 +349,6 @@ export async function updateReservationService(
       updatedAt: updated.updatedAt,
     };
   } finally {
-    releaseLock();
+    await releaseLock();
   }
 }

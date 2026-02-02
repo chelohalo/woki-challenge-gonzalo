@@ -4,7 +4,7 @@ import { db } from '../src/db/index.js';
 import { restaurants, sectors, tables, reservations, idempotencyKeys } from '../src/db/schema.js';
 import { createReservationService, cancelReservationService } from '../src/services/reservation.service.js';
 import { getAvailability } from '../src/services/availability.service.js';
-import { Errors } from '../src/utils/errors.js';
+import { getRedis } from '../src/utils/redis.js';
 import type { Customer } from '../src/types/index.js';
 
 const baseDate = '2025-09-08T00:00:00-03:00';
@@ -81,6 +81,15 @@ async function seedTestData() {
 }
 
 beforeAll(async () => {
+  // Tests require Redis for distributed locks. Fail fast with clear message if unavailable.
+  const redis = getRedis();
+  try {
+    await redis.ping();
+  } catch (err) {
+    throw new Error(
+      'Redis is required for tests (distributed locks). Start Redis with: docker run -d --name redis -p 6379:6379 redis:7-alpine'
+    );
+  }
   await seedTestData();
 });
 
@@ -220,6 +229,44 @@ describe('Reservation Service', () => {
 
       expect(allReservations.length).toBe(1);
     }, 20000); // Increase timeout for concurrency test
+
+    it('should prevent overlapping slots: one 201, one 409 when two creates at 20:00 and 20:15 same sector', async () => {
+      const start1 = '2025-09-08T20:00:00-03:00'; // 90 min → 20:00–21:30
+      const start2 = '2025-09-08T20:15:00-03:00'; // 90 min → 20:15–21:45 (overlaps 20:15–21:30)
+
+      const [result1, result2] = await Promise.allSettled([
+        createReservationService({
+          restaurantId: testRestaurantId,
+          sectorId: testSectorId,
+          partySize: 2,
+          startDateTimeISO: start1,
+          customer: testCustomer,
+        }),
+        createReservationService({
+          restaurantId: testRestaurantId,
+          sectorId: testSectorId,
+          partySize: 2,
+          startDateTimeISO: start2,
+          customer: {
+            ...testCustomer,
+            name: 'Overlap User',
+          },
+        }),
+      ]);
+
+      const fulfilled = [result1, result2].filter((r) => r.status === 'fulfilled');
+      const rejected = [result1, result2].filter((r) => r.status === 'rejected');
+
+      expect(fulfilled.length).toBe(1);
+      expect(rejected.length).toBe(1);
+
+      if (rejected[0].status === 'rejected') {
+        expect(rejected[0].reason?.code ?? rejected[0].reason?.message).toBeDefined();
+        const msg = String(rejected[0].reason?.message ?? rejected[0].reason?.detail ?? '').toLowerCase();
+        // Rejection can be due to lock (Lock busy) or no table (no available table fits)
+        expect(msg).toMatch(/capacity|lock|busy|no available table|requested time/);
+      }
+    }, 20000);
   });
 
   describe('Boundaries', () => {

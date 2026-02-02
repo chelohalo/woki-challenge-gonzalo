@@ -29,7 +29,7 @@ export async function assignTable(
 
   // 2. Try single table first (best fit)
   const eligibleTables = await getEligibleTables(sectorId, partySize);
-  
+
   if (eligibleTables.length > 0) {
     // Sort by "best fit" - prefer tables with maxSize closest to partySize
     const sortedTables = eligibleTables.sort(
@@ -59,14 +59,14 @@ export async function assignTable(
   // 3. No single table fits - try combinations
   // Get all tables in sector (not just eligible ones)
   const allTables = await getTablesBySector(sectorId);
-  
+
   if (allTables.length === 0) {
     return null;
   }
 
   // Filter tables that can contribute (minSize <= partySize)
   const candidateTables = allTables.filter(t => t.minSize <= partySize);
-  
+
   if (candidateTables.length === 0) {
     return null;
   }
@@ -111,7 +111,7 @@ async function findTableCombination(
 ): Promise<string[] | null> {
   // Generate combinations using a recursive approach
   // We'll use a greedy algorithm: try combinations starting with largest tables
-  
+
   // Helper function to generate combinations
   function* generateCombinations(
     arr: Array<{ id: string; minSize: number; maxSize: number }>,
@@ -139,7 +139,7 @@ async function findTableCombination(
       const table = candidateTables.find(t => t.id === tid);
       return sum + (table?.minSize || 0);
     }, 0);
-    
+
     const totalMaxCapacity = tableIds.reduce((sum, tid) => {
       const table = candidateTables.find(t => t.id === tid);
       return sum + (table?.maxSize || 0);

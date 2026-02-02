@@ -22,12 +22,12 @@
   "dependencies": {
     "@fastify/cors": "^9.0.1",
     "@libsql/client": "^0.14.0",
-    "async-mutex": "^0.5.0",
     "date-fns": "^3.6.0",
     "date-fns-tz": "^3.1.0",
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.30.10",
     "fastify": "^4.26.0",
+    "ioredis": "^5.9.2",
     "nanoid": "^5.0.7",
     "zod": "^3.23.8"
   },
