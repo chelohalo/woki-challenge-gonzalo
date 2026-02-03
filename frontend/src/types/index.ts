@@ -36,5 +36,6 @@ export interface AvailabilitySlot {
 export interface AvailabilityResponse {
   slotMinutes: number;
   durationMinutes: number;
+  totalTablesInSector?: number;
   slots: AvailabilitySlot[];
 }

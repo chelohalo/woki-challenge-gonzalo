@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { getAvailability } from '../services/availability.service.js';
 import { getRestaurantById } from '../repositories/restaurant.repository.js';
+import { getTablesBySector } from '../repositories/table.repository.js';
 import { calculateReservationDuration } from '../utils/duration.js';
 import { availabilityQuerySchema } from '../schemas/reservation.schema.js';
 import { Errors, AppError } from '../utils/errors.js';
@@ -10,7 +11,7 @@ export async function availabilityRoutes(fastify: FastifyInstance) {
   fastify.get('/availability', async (request, reply) => {
     const startTime = Date.now();
     const requestId = request.requestId || 'unknown';
-    
+
     try {
       const query = availabilityQuerySchema.parse(request.query);
       const date = new Date(query.date + 'T00:00:00');
@@ -29,12 +30,12 @@ export async function availabilityRoutes(fastify: FastifyInstance) {
         throw Errors.NOT_FOUND('Restaurant');
       }
 
-      const slots = await getAvailability(
-        query.restaurantId,
-        query.sectorId,
-        date,
-        query.partySize
-      );
+      const [slots, sectorTables] = await Promise.all([
+        getAvailability(query.restaurantId, query.sectorId, date, query.partySize),
+        getTablesBySector(query.sectorId),
+      ]);
+
+      const totalTablesInSector = sectorTables.length;
 
       // Calculate duration for this specific party size
       const reservationDurationMinutes = calculateReservationDuration(
@@ -45,7 +46,7 @@ export async function availabilityRoutes(fastify: FastifyInstance) {
 
       const duration = Date.now() - startTime;
       const availableSlots = slots.filter(s => s.available).length;
-      
+
       // Track metrics
       Metrics.increment('availabilityQueries');
 
@@ -62,12 +63,13 @@ export async function availabilityRoutes(fastify: FastifyInstance) {
       return {
         slotMinutes: 15,
         durationMinutes: reservationDurationMinutes,
+        totalTablesInSector,
         slots,
       };
     } catch (error: unknown) {
       const duration = Date.now() - startTime;
       Metrics.increment('errors');
-      
+
       const errorMessage = error instanceof Error ? error.message : String(error);
       request.log.error({
         requestId,

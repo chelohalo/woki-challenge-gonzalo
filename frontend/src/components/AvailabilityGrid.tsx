@@ -8,6 +8,7 @@ interface AvailabilityGridProps {
   onSlotClick: (slot: AvailabilitySlot) => void;
   selectedDate: Date;
   durationMinutes?: number;
+  totalTablesInSector?: number;
 }
 
 export function AvailabilityGrid({
@@ -15,6 +16,7 @@ export function AvailabilityGrid({
   onSlotClick,
   selectedDate,
   durationMinutes = 90,
+  totalTablesInSector,
 }: AvailabilityGridProps) {
   // Group slots by shift (morning/evening)
   const morningSlots = slots.filter((slot) => {
@@ -72,14 +74,20 @@ export function AvailabilityGrid({
               `}
               title={
                 slot.available
-                  ? `Available - ${slot.tables?.length || 0} table(s)${
-                      slot.tables?.length ? `: ${slot.tables.join(", ")}` : ""
-                    } - Click to reserve`
+                  ? `${slot.tables?.length ?? 0} libres, ${Math.max(
+                      0,
+                      (totalTablesInSector ?? slot.tables?.length ?? 0) -
+                        (slot.tables?.length ?? 0)
+                    )} ocupadas${
+                      slot.tables?.length
+                        ? ` · Mesas: ${slot.tables.join(", ")}`
+                        : ""
+                    } · Click para reservar`
                   : slot.reason === "guest_limit"
-                  ? "Guest limit reached for this slot"
+                  ? "Límite de comensales en este slot"
                   : slot.reason === "no_capacity"
-                  ? "No capacity available"
-                  : "Unavailable"
+                  ? "Sin mesas disponibles"
+                  : "No disponible"
               }
             >
               <div className="flex flex-col items-center gap-1">
@@ -88,16 +96,35 @@ export function AvailabilityGrid({
                 </span>
                 {slot.available && slot.tables && slot.tables.length > 0 && (
                   <>
-                    <span className="text-xs opacity-75">
-                      {slot.tables.length}{" "}
-                      {slot.tables.length === 1 ? "table" : "tables"}
-                    </span>
-                    <span
-                      className="text-[10px] opacity-60 truncate max-w-full"
-                      title={slot.tables.join(", ")}
-                    >
-                      {slot.tables.join(", ")}
-                    </span>
+                    {typeof totalTablesInSector === "number" ? (
+                      <>
+                        <span className="text-xs font-medium opacity-90">
+                          {slot.tables.length} libres
+                        </span>
+                        <span className="text-[10px] opacity-70">
+                          {totalTablesInSector - slot.tables.length} ocupadas ·{" "}
+                          {totalTablesInSector} total
+                        </span>
+                        <span
+                          className="text-[10px] opacity-60 truncate max-w-full"
+                          title={slot.tables.join(", ")}
+                        >
+                          {slot.tables.join(", ")}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-xs opacity-75">
+                          {slot.tables.length} mesas disponibles
+                        </span>
+                        <span
+                          className="text-[10px] opacity-60 truncate max-w-full"
+                          title={slot.tables.join(", ")}
+                        >
+                          {slot.tables.join(", ")}
+                        </span>
+                      </>
+                    )}
                   </>
                 )}
               </div>

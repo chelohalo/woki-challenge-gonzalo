@@ -43,6 +43,9 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [durationMinutes, setDurationMinutes] = useState<number>(90);
+  const [totalTablesInSector, setTotalTablesInSector] = useState<
+    number | undefined
+  >(undefined);
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -100,6 +103,7 @@ export default function Home() {
       });
       setAvailability(sortedSlots);
       setDurationMinutes(data.durationMinutes);
+      setTotalTablesInSector(data.totalTablesInSector);
     } catch (err: any) {
       const errorMessage = err.message || "Failed to load availability";
       // Extract more specific error message if available
@@ -116,6 +120,7 @@ export default function Home() {
       }
       setError(displayMessage);
       setAvailability([]);
+      setTotalTablesInSector(undefined);
     } finally {
       setIsLoading(false);
     }
@@ -547,6 +552,7 @@ export default function Home() {
                 onSlotClick={handleSlotClick}
                 selectedDate={selectedDate}
                 durationMinutes={durationMinutes}
+                totalTablesInSector={totalTablesInSector}
               />
             )}
           </div>
