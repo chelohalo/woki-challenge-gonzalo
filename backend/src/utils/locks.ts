@@ -18,6 +18,13 @@ export interface AcquireReservationLocksOptions {
   ttlMs?: number;
 }
 
+export interface AcquireRestaurantLocksOptions {
+  restaurantId: string;
+  startISO: string;
+  endISO: string;
+  ttlMs?: number;
+}
+
 /**
  * Generate 15-minute slot ISO strings (canonical UTC) for the interval [startISO, endISO) (end exclusive).
  */
@@ -38,6 +45,13 @@ function get15MinSlotsInRange(startISO: string, endISO: string): string[] {
  */
 function lockKey(sectorId: string, slotISO: string): string {
   return `lock:sector:${sectorId}:slot:${slotISO}`;
+}
+
+/**
+ * Build Redis key for restaurant+slot (for maxGuestsPerSlot): lock:restaurant:{restaurantId}:slot:{slotISO}
+ */
+function restaurantLockKey(restaurantId: string, slotISO: string): string {
+  return `lock:restaurant:${restaurantId}:slot:${slotISO}`;
 }
 
 /**
@@ -88,6 +102,52 @@ export async function acquireReservationLocks(options: AcquireReservationLocksOp
   } catch (err) {
     if (err instanceof AppError) throw err;
     // Redis errors: release acquired keys before rethrowing
+    for (const k of acquired) {
+      await redis.eval(RELEASE_SCRIPT, 1, k, token).catch(() => { });
+    }
+    throw err;
+  }
+
+  return async function release(): Promise<void> {
+    for (const key of acquired) {
+      await redis.eval(RELEASE_SCRIPT, 1, key, token).catch(() => { });
+    }
+  };
+}
+
+/**
+ * Acquire distributed locks for restaurant-level slots (for maxGuestsPerSlot).
+ * Use in addition to sector locks so only one reservation is created per restaurant per slot at a time.
+ */
+export async function acquireRestaurantReservationLocks(options: AcquireRestaurantLocksOptions): Promise<() => Promise<void>> {
+  const { restaurantId, startISO, endISO, ttlMs = DEFAULT_TTL_MS } = options;
+  const redis = getRedis();
+
+  const slotISOs = get15MinSlotsInRange(startISO, endISO);
+  if (slotISOs.length === 0) {
+    return async () => { };
+  }
+
+  const keys = slotISOs
+    .map((slotISO) => restaurantLockKey(restaurantId, slotISO))
+    .sort();
+
+  const token = nanoid();
+  const acquired: string[] = [];
+
+  try {
+    for (const key of keys) {
+      const result = await redis.set(key, token, 'PX', ttlMs, 'NX');
+      if (result !== 'OK') {
+        for (const k of acquired) {
+          await redis.eval(RELEASE_SCRIPT, 1, k, token);
+        }
+        throw Errors.NO_CAPACITY('Lock busy - another reservation is being processed for this time');
+      }
+      acquired.push(key);
+    }
+  } catch (err) {
+    if (err instanceof AppError) throw err;
     for (const k of acquired) {
       await redis.eval(RELEASE_SCRIPT, 1, k, token).catch(() => { });
     }

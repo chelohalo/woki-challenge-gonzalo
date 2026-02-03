@@ -42,14 +42,20 @@ export async function getAvailability(
     (t) => t.minSize <= partySize && partySize <= t.maxSize
   );
 
-  // 5. Get ALL reservations for the day ONCE (optimization: single query)
-  // Pass timezone so it can calculate day bounds correctly
+  // 5. Get reservations: sector for table availability; whole restaurant for guest-count limit
   const allReservations = await getReservationsByDay(
     restaurantId,
     date,
     sectorId,
     restaurant.timezone
   );
+  const allReservationsRestaurant = await getReservationsByDay(
+    restaurantId,
+    date,
+    undefined,
+    restaurant.timezone
+  );
+  const maxGuestsPerSlot = restaurant.maxGuestsPerSlot ?? null;
 
   // 6. Calculate reservation duration for this party size
   const reservationDurationMinutes = calculateReservationDuration(
@@ -87,9 +93,29 @@ export async function getAvailability(
       continue; // Skip slots outside shifts
     }
 
-    // Check for available tables (single or combinations)
     const slotStartTime = new Date(slotStartISO).getTime();
     const slotEndTime = new Date(slotEndISO).getTime();
+
+    // Restaurant-wide guest limit per slot
+    if (maxGuestsPerSlot !== null) {
+      const guestsInSlot = allReservationsRestaurant
+        .filter((r) => {
+          const rStart = new Date(r.startDateTime).getTime();
+          const rEnd = new Date(r.endDateTime).getTime();
+          return rStart < slotEndTime && rEnd > slotStartTime;
+        })
+        .reduce((sum, r) => sum + r.partySize, 0);
+      if (guestsInSlot + partySize > maxGuestsPerSlot) {
+        availability.push({
+          start: slotStartISO,
+          available: false,
+          reason: 'guest_limit',
+        });
+        continue;
+      }
+    }
+
+    // Check for available tables (single or combinations)
 
     // First, try single tables
     const availableSingleTables: string[] = [];

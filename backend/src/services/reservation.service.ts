@@ -5,12 +5,13 @@ import { assignTable } from './table-assignment.service.js';
 import {
   createReservation,
   getReservationById,
+  getOverlappingReservationsForRestaurant,
   cancelReservation as cancelReservationRepo,
 } from '../repositories/reservation.repository.js';
 import { addMinutesToDate, formatISODateTime, isWithinShift } from '../utils/datetime.js';
 import { calculateReservationDuration } from '../utils/duration.js';
 import { validateAdvanceBooking } from '../utils/booking-policy.js';
-import { acquireReservationLocks } from '../utils/locks.js';
+import { acquireReservationLocks, acquireRestaurantReservationLocks } from '../utils/locks.js';
 import { Errors } from '../utils/errors.js';
 import type { CustomerInput } from '../types/index.js';
 
@@ -55,20 +56,44 @@ export async function createReservationService(data: {
   const endDate = addMinutesToDate(startDate, reservationDurationMinutes);
   const endDateTimeISO = formatISODateTime(endDate);
 
-  // 5. Acquire distributed locks for every 15-min slot in [start, end)
-  const releaseLock = await acquireReservationLocks({
+  const maxGuests = restaurant.maxGuestsPerSlot ?? null;
+
+  // 5. Acquire restaurant-level locks when guest limit is set (serialize by restaurant+slot)
+  const releaseRestaurantLock = maxGuests !== null
+    ? await acquireRestaurantReservationLocks({
+      restaurantId: data.restaurantId,
+      startISO: data.startDateTimeISO,
+      endISO: endDateTimeISO,
+    })
+    : async () => { };
+
+  // 6. Acquire sector locks for every 15-min slot in [start, end)
+  const releaseSectorLock = await acquireReservationLocks({
     sectorId: data.sectorId,
     startISO: data.startDateTimeISO,
     endISO: endDateTimeISO,
   });
 
   try {
-    // 6. Check if this is a large group requiring approval
+    // 7. Enforce restaurant-wide guest limit (under lock so count is consistent)
+    if (maxGuests !== null) {
+      const overlapping = await getOverlappingReservationsForRestaurant(
+        data.restaurantId,
+        data.startDateTimeISO,
+        endDateTimeISO
+      );
+      const currentGuests = overlapping.reduce((sum, r) => sum + r.partySize, 0);
+      if (currentGuests + data.partySize > maxGuests) {
+        throw Errors.NO_CAPACITY('Restaurant guest limit per time slot reached');
+      }
+    }
+
+    // 8. Check if this is a large group requiring approval
     const isLargeGroup = restaurant.largeGroupThreshold !== null &&
       restaurant.largeGroupThreshold !== undefined &&
       data.partySize >= restaurant.largeGroupThreshold;
 
-    // 7. Assign table(s) (within lock to prevent race conditions)
+    // 9. Assign table(s) (within lock to prevent race conditions)
     const tableIds = await assignTable(
       data.sectorId,
       data.startDateTimeISO,
@@ -79,7 +104,7 @@ export async function createReservationService(data: {
       throw Errors.NO_CAPACITY();
     }
 
-    // 8. Determine status and expiration
+    // 10. Determine status and expiration
     let status: 'CONFIRMED' | 'PENDING' = 'CONFIRMED';
     let expiresAt: string | null = null;
 
@@ -90,7 +115,7 @@ export async function createReservationService(data: {
       expiresAt = formatISODateTime(expirationDate);
     }
 
-    // 9. Expire any old pending holds before creating new reservation
+    // 11. Expire any old pending holds before creating new reservation
     const { expirePendingHolds } = await import('./pending-holds.service.js');
     const expiredCount = await expirePendingHolds();
     if (expiredCount > 0) {
@@ -98,7 +123,7 @@ export async function createReservationService(data: {
       // (logger not available here, but could add if needed)
     }
 
-    // 10. Create reservation
+    // 12. Create reservation
     const now = formatISODateTime(new Date());
     const reservationId = `RES_${nanoid(8).toUpperCase()}`;
 
@@ -124,7 +149,7 @@ export async function createReservationService(data: {
       throw new Error('Failed to create reservation');
     }
 
-    // 11. Format response
+    // 13. Format response
     return {
       id: reservation.id,
       restaurantId: reservation.restaurantId,
@@ -146,8 +171,8 @@ export async function createReservationService(data: {
       updatedAt: reservation.updatedAt,
     };
   } finally {
-    // Always release lock, even if there's an error
-    await releaseLock();
+    await releaseSectorLock();
+    await releaseRestaurantLock();
   }
 }
 
@@ -270,14 +295,36 @@ export async function updateReservationService(
   const newEndDate = addMinutesToDate(newStartDate, reservationDurationMinutes);
   const newEndDateTimeISO = formatISODateTime(newEndDate);
 
-  // Acquire distributed locks for every 15-min slot in [start, end)
-  const releaseLock = await acquireReservationLocks({
+  const maxGuests = restaurant.maxGuestsPerSlot ?? null;
+
+  const releaseRestaurantLock = maxGuests !== null
+    ? await acquireRestaurantReservationLocks({
+      restaurantId: existingReservation.restaurantId,
+      startISO: newStartDateTimeISO,
+      endISO: newEndDateTimeISO,
+    })
+    : async () => { };
+
+  const releaseSectorLock = await acquireReservationLocks({
     sectorId: newSectorId,
     startISO: newStartDateTimeISO,
     endISO: newEndDateTimeISO,
   });
 
   try {
+    if (maxGuests !== null) {
+      const overlapping = await getOverlappingReservationsForRestaurant(
+        existingReservation.restaurantId,
+        newStartDateTimeISO,
+        newEndDateTimeISO,
+        id
+      );
+      const currentGuests = overlapping.reduce((sum, r) => sum + r.partySize, 0);
+      if (currentGuests + newPartySize > maxGuests) {
+        throw Errors.NO_CAPACITY('Restaurant guest limit per time slot reached');
+      }
+    }
+
     // If time or sector changed, need to re-assign table
     let newTableIds = existingReservation.tableIds;
 
@@ -349,6 +396,7 @@ export async function updateReservationService(
       updatedAt: updated.updatedAt,
     };
   } finally {
-    await releaseLock();
+    await releaseSectorLock();
+    await releaseRestaurantLock();
   }
 }

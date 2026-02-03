@@ -39,6 +39,7 @@ async function seed() {
     maxAdvanceDays: 90, // Up to 90 days so next months are bookable
     largeGroupThreshold: 8, // Groups of 8+ require approval
     pendingHoldTTLMinutes: 60, // Pending holds expire after 60 minutes
+    maxGuestsPerSlot: 25, // Max 25 guests per 15-min slot (whole restaurant)
     createdAt: baseDate,
     updatedAt: baseDate,
   });

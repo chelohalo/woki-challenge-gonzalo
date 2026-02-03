@@ -12,6 +12,7 @@ export const restaurants = sqliteTable('restaurants', {
   maxAdvanceDays: integer('max_advance_days'),
   largeGroupThreshold: integer('large_group_threshold'),
   pendingHoldTTLMinutes: integer('pending_hold_ttl_minutes'),
+  maxGuestsPerSlot: integer('max_guests_per_slot'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 });

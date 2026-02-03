@@ -7,6 +7,14 @@ import { getAvailability } from '../src/services/availability.service.js';
 import { getRedis } from '../src/utils/redis.js';
 import type { Customer } from '../src/types/index.js';
 
+// Use a future date so availability slots are not filtered as "past"
+const testDate = (() => {
+  const d = new Date();
+  d.setDate(d.getDate() + 14);
+  d.setHours(0, 0, 0, 0);
+  return d;
+})();
+const testDateStr = testDate.toISOString().slice(0, 10); // YYYY-MM-DD
 const baseDate = '2025-09-08T00:00:00-03:00';
 const testRestaurantId = 'R1';
 const testSectorId = 'S1';
@@ -102,7 +110,7 @@ beforeEach(async () => {
 describe('Reservation Service', () => {
   describe('Happy Path', () => {
     it('should create a valid reservation', async () => {
-      const startDateTime = '2025-09-08T20:00:00-03:00';
+      const startDateTime = `${testDateStr}T20:00:00-03:00`;
 
       const reservation = await createReservationService({
         restaurantId: testRestaurantId,
@@ -120,7 +128,7 @@ describe('Reservation Service', () => {
     });
 
     it('should make slot unavailable after reservation', async () => {
-      const startDateTime = '2025-09-08T20:00:00-03:00';
+      const startDateTime = `${testDateStr}T20:00:00-03:00`;
 
       // Create reservation
       const reservation = await createReservationService({
@@ -132,7 +140,7 @@ describe('Reservation Service', () => {
       });
 
       // Check availability
-      const date = new Date('2025-09-08');
+      const date = new Date(testDateStr);
       const availability = await getAvailability(
         testRestaurantId,
         testSectorId,
@@ -163,7 +171,7 @@ describe('Reservation Service', () => {
 
   describe('Idempotency', () => {
     it('should return same reservation for same idempotency key', async () => {
-      const startDateTime = '2025-09-08T20:00:00-03:00';
+      const startDateTime = `${testDateStr}T20:00:00-03:00`;
       const idempotencyKey = 'test-key-123';
 
       const reservation1 = await createReservationService({
@@ -190,7 +198,7 @@ describe('Reservation Service', () => {
 
   describe('Concurrency', () => {
     it('should prevent double-booking with concurrent requests', async () => {
-      const startDateTime = '2025-09-08T20:00:00-03:00';
+      const startDateTime = `${testDateStr}T20:00:00-03:00`;
 
       // Create two concurrent reservation requests for the SAME table slot
       // Use Promise.allSettled to ensure both start at the same time
@@ -231,8 +239,8 @@ describe('Reservation Service', () => {
     }, 20000); // Increase timeout for concurrency test
 
     it('should prevent overlapping slots: one 201, one 409 when two creates at 20:00 and 20:15 same sector', async () => {
-      const start1 = '2025-09-08T20:00:00-03:00'; // 90 min → 20:00–21:30
-      const start2 = '2025-09-08T20:15:00-03:00'; // 90 min → 20:15–21:45 (overlaps 20:15–21:30)
+      const start1 = `${testDateStr}T20:00:00-03:00`; // 90 min → 20:00–21:30
+      const start2 = `${testDateStr}T20:15:00-03:00`; // 90 min → 20:15–21:45 (overlaps 20:15–21:30)
 
       const [result1, result2] = await Promise.allSettled([
         createReservationService({
@@ -271,8 +279,8 @@ describe('Reservation Service', () => {
 
   describe('Boundaries', () => {
     it('should allow adjacent reservations without collision', async () => {
-      const start1 = '2025-09-08T20:00:00-03:00';
-      const start2 = '2025-09-08T21:30:00-03:00'; // Exactly when first ends (90 min later)
+      const start1 = `${testDateStr}T20:00:00-03:00`;
+      const start2 = `${testDateStr}T21:30:00-03:00`; // Exactly when first ends (90 min later)
 
       // Create first reservation
       const reservation1 = await createReservationService({
@@ -303,8 +311,8 @@ describe('Reservation Service', () => {
     });
 
     it('should prevent overlapping reservations on same table', async () => {
-      const start1 = '2025-09-08T20:00:00-03:00';
-      const start2 = '2025-09-08T20:30:00-03:00'; // Overlaps with first (30 min into 90 min reservation)
+      const start1 = `${testDateStr}T20:00:00-03:00`;
+      const start2 = `${testDateStr}T20:30:00-03:00`; // Overlaps with first (30 min into 90 min reservation)
 
       // Create first reservation
       const reservation1 = await createReservationService({
@@ -343,7 +351,7 @@ describe('Reservation Service', () => {
 
   describe('Validation', () => {
     it('should reject reservation outside service window', async () => {
-      const outsideShift = '2025-09-08T18:00:00-03:00'; // Between shifts
+      const outsideShift = `${testDateStr}T18:00:00-03:00`; // Between shifts
 
       await expect(
         createReservationService({
@@ -357,7 +365,7 @@ describe('Reservation Service', () => {
     });
 
     it('should reject reservation when no capacity', async () => {
-      const startDateTime = '2025-09-08T20:00:00-03:00';
+      const startDateTime = `${testDateStr}T20:00:00-03:00`;
 
       // Fill all tables (we have 2 tables)
       await createReservationService({
@@ -397,7 +405,7 @@ describe('Reservation Service', () => {
 
   describe('Cancel', () => {
     it('should cancel reservation and free up slot', async () => {
-      const startDateTime = '2025-09-08T20:00:00-03:00';
+      const startDateTime = `${testDateStr}T20:00:00-03:00`;
 
       // Create reservation
       const reservation = await createReservationService({
@@ -412,7 +420,7 @@ describe('Reservation Service', () => {
       await cancelReservationService(reservation.id);
 
       // Check that slot is available again
-      const date = new Date('2025-09-08');
+      const date = new Date(testDateStr);
       const availability = await getAvailability(
         testRestaurantId,
         testSectorId,
@@ -437,7 +445,7 @@ describe('Reservation Service', () => {
   describe('Table Combinations', () => {
     it('should assign multiple tables when no single table fits', async () => {
       // Create a reservation for party size 8 (no single table fits, need combination)
-      const startDateTime = '2025-09-08T20:00:00-03:00';
+      const startDateTime = `${testDateStr}T20:00:00-03:00`;
 
       const reservation = await createReservationService({
         restaurantId: testRestaurantId,

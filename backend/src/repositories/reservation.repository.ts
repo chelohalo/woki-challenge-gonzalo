@@ -21,7 +21,7 @@ export async function getReservationsByDay(
   // Get restaurant timezone if not provided (we'll need to fetch it)
   // For now, assume it's passed or use a default
   const tz = timezone || 'UTC';
-  
+
   // Get calendar day bounds in UTC (representing local day in restaurant timezone)
   const dayStartUTC = getZonedDayStartUTC(date, tz);
   // End of same calendar day in restaurant TZ = start of next day minus 1ms
@@ -53,6 +53,42 @@ export async function getReservationsByDay(
   });
 }
 
+/**
+ * Returns all CONFIRMED/PENDING reservations for the restaurant that overlap
+ * with [startDateTime, endDateTime). Used to count guests per slot for maxGuestsPerSlot.
+ */
+export async function getOverlappingReservationsForRestaurant(
+  restaurantId: string,
+  startDateTime: string,
+  endDateTime: string,
+  excludeReservationId?: string
+) {
+  const conditions = [
+    eq(reservations.restaurantId, restaurantId),
+    or(
+      eq(reservations.status, 'CONFIRMED'),
+      eq(reservations.status, 'PENDING')
+    ),
+  ];
+  if (excludeReservationId) {
+    conditions.push(ne(reservations.id, excludeReservationId));
+  }
+
+  const rows = await db
+    .select({ id: reservations.id, partySize: reservations.partySize, startDateTime: reservations.startDateTime, endDateTime: reservations.endDateTime })
+    .from(reservations)
+    .where(and(...conditions));
+
+  const startTime = new Date(startDateTime).getTime();
+  const endTime = new Date(endDateTime).getTime();
+
+  return rows.filter((r) => {
+    const rStart = new Date(r.startDateTime).getTime();
+    const rEnd = new Date(r.endDateTime).getTime();
+    return rStart < endTime && rEnd > startTime;
+  });
+}
+
 export async function getOverlappingReservations(
   tableIds: string[],
   startDateTime: string,
@@ -67,7 +103,7 @@ export async function getOverlappingReservations(
       eq(reservations.status, 'PENDING')
     ),
   ];
-  
+
   if (excludeReservationId) {
     // Exclude the reservation being updated
     conditions.push(ne(reservations.id, excludeReservationId));
@@ -85,11 +121,11 @@ export async function getOverlappingReservations(
   return allReservations.filter((r) => {
     const rStartTime = new Date(r.startDateTime).getTime();
     const rEndTime = new Date(r.endDateTime).getTime();
-    
+
     // Check overlap: (r.start < endDateTime) AND (r.end > startDateTime)
     const overlaps = rStartTime < endTime && rEndTime > startTime;
     if (!overlaps) return false;
-    
+
     // Check if any table overlaps
     return r.tableIds.some((tid) => tableIds.includes(tid));
   });
@@ -141,7 +177,7 @@ export async function updateReservation(
   }
 ) {
   const updateData: Record<string, unknown> = { updatedAt: data.updatedAt };
-  
+
   if (data.sectorId !== undefined) updateData.sectorId = data.sectorId;
   if (data.tableIds !== undefined) updateData.tableIds = data.tableIds;
   if (data.partySize !== undefined) updateData.partySize = data.partySize;
