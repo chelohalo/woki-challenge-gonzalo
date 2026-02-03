@@ -47,7 +47,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     let errorDetail: string;
     let errorCode: string | undefined;
-    
+
     try {
       const errorData = await response.json() as { error?: string; detail?: string; code?: string };
       errorDetail = errorData.detail || errorData.error || response.statusText;
@@ -112,7 +112,7 @@ export const api = {
       const headers: HeadersInit = {
         'Content-Type': 'application/json',
       };
-      
+
       if (idempotencyKey) {
         headers['idempotency-key'] = idempotencyKey;
       }
@@ -126,7 +126,7 @@ export const api = {
         },
         REQUEST_TIMEOUT_MS
       );
-      
+
       return handleResponse<T>(response);
     } catch (error) {
       if (error instanceof TimeoutError) {
@@ -154,7 +154,7 @@ export const api = {
         },
         REQUEST_TIMEOUT_MS
       );
-      
+
       if (!response.ok) {
         await handleResponse<never>(response);
       }
@@ -180,7 +180,7 @@ export const api = {
       const headers: HeadersInit = {
         'Content-Type': 'application/json',
       };
-      
+
       if (idempotencyKey) {
         headers['idempotency-key'] = idempotencyKey;
       }
@@ -194,7 +194,7 @@ export const api = {
         },
         REQUEST_TIMEOUT_MS
       );
-      
+
       return handleResponse<T>(response);
     } catch (error) {
       if (error instanceof TimeoutError) {
@@ -214,6 +214,11 @@ export const api = {
 };
 
 // API endpoints
+export const sectorsApi = {
+  get: (restaurantId: string) =>
+    api.get<{ items: Array<{ id: string; name: string }> }>(`/restaurants/${restaurantId}/sectors`),
+};
+
 export const availabilityApi = {
   get: (restaurantId: string, sectorId: string, date: string, partySize: number) =>
     api.get<import('../types').AvailabilityResponse>(

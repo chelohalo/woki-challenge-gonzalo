@@ -12,14 +12,15 @@ import { Spinner } from "../src/components/Spinner";
 import { Toast, useToast } from "../src/components/Toast";
 import { ConfirmDialog } from "../src/components/ConfirmDialog";
 import { useApiLoading } from "../src/hooks/useApiLoading";
-import { availabilityApi, reservationsApi } from "../src/lib/api";
+import { availabilityApi, reservationsApi, sectorsApi } from "../src/lib/api";
 import type { AvailabilitySlot, Reservation } from "../src/types";
 
 const AUTH_TOKEN_KEY = "woki_auth_token";
 
-// Hardcoded for demo - in production these would come from context/config
 const RESTAURANT_ID = "R1";
-const SECTORS = [
+
+// Fallback when API fails or before load (e.g. dev without backend)
+const SECTORS_FALLBACK: Array<{ id: string; name: string }> = [
   { id: "S1", name: "Main Hall" },
   { id: "S2", name: "Terrace" },
   { id: "S3", name: "Bar" },
@@ -27,8 +28,10 @@ const SECTORS = [
 
 export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [sectors, setSectors] =
+    useState<Array<{ id: string; name: string }>>(SECTORS_FALLBACK);
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [selectedSector, setSelectedSector] = useState(SECTORS[0].id);
+  const [selectedSector, setSelectedSector] = useState(SECTORS_FALLBACK[0].id);
   const [partySize, setPartySize] = useState(2);
   const [availability, setAvailability] = useState<AvailabilitySlot[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
@@ -57,6 +60,25 @@ export default function Home() {
       setIsAuthenticated(true);
     }
   }, []);
+
+  // Load sectors from API when authenticated (dropdown only shows sectors that exist in DB)
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    sectorsApi
+      .get(RESTAURANT_ID)
+      .then((data) => {
+        if (data.items?.length) {
+          setSectors(data.items);
+          setSelectedSector((current) => {
+            const exists = data.items.some((s) => s.id === current);
+            return exists ? current : data.items[0].id;
+          });
+        }
+      })
+      .catch(() => {
+        // Keep SECTORS_FALLBACK on error (e.g. backend down)
+      });
+  }, [isAuthenticated]);
 
   const dateString = format(selectedDate, "yyyy-MM-dd");
 
@@ -87,7 +109,7 @@ export default function Home() {
         errorMessage.includes("not_found")
       ) {
         displayMessage = `Sector "${
-          SECTORS.find((s) => s.id === selectedSector)?.name || selectedSector
+          sectors.find((s) => s.id === selectedSector)?.name || selectedSector
         }" not found. Please try a different sector.`;
       } else if (errorMessage.includes("Restaurant not found")) {
         displayMessage = "Restaurant not found. Please refresh the page.";
@@ -435,7 +457,7 @@ export default function Home() {
                 onChange={(e) => setSelectedSector(e.target.value)}
                 className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 transition-all"
               >
-                {SECTORS.map((sector) => (
+                {sectors.map((sector) => (
                   <option key={sector.id} value={sector.id}>
                     {sector.name}
                   </option>
@@ -564,7 +586,7 @@ export default function Home() {
           <EditReservationForm
             reservation={editingReservation}
             availableSlots={availability}
-            sectors={SECTORS}
+            sectors={sectors}
             onSuccess={handleEditSuccess}
             onCancel={() => setEditingReservation(null)}
           />

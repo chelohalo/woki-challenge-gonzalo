@@ -497,13 +497,14 @@ Response:
    - Create a new database for production
    - Copy the database URL and auth token
 
-2. **Run Migrations**
+2. **Run Migrations & Seed**
    ```bash
    cd backend
-   # Set production DATABASE_URL and TURSO_AUTH_TOKEN
+   # Set production DATABASE_URL and TURSO_AUTH_TOKEN (e.g. in .env or Railway env)
    npm run db:push
-   npm run db:seed  # Optional: seed initial data
+   npm run db:seed   # Required: creates sectors (Main Hall, Terrace, Bar) and tables
    ```
+   Without the seed, the sectors "Terrace" and "Bar" (and their tables) won't exist; the frontend loads sectors from the API, so only sectors present in the DB will appear in the dropdown.
 
 ### Post-Deployment Checklist
 

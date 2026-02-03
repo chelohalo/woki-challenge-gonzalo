@@ -5,6 +5,7 @@ import { env } from './config/env.js';
 import { availabilityRoutes } from './routes/availability.routes.js';
 import { reservationsRoutes } from './routes/reservations.routes.js';
 import { authRoutes } from './routes/auth.routes.js';
+import { restaurantRoutes } from './routes/restaurants.routes.js';
 import { Errors, AppError } from './utils/errors.js';
 import { requestIdMiddleware } from './middlewares/request-id.middleware.js';
 
@@ -49,7 +50,7 @@ const app = Fastify({
 
 // CORS configuration
 app.register(cors, {
-  origin: env.NODE_ENV === 'production' 
+  origin: env.NODE_ENV === 'production'
     ? env.FRONTEND_URL || 'https://your-frontend-domain.com'
     : ['http://localhost:3000', 'http://127.0.0.1:3000'],
   credentials: true,
@@ -61,10 +62,10 @@ app.addHook('onRequest', requestIdMiddleware);
 // Error handler with structured logging
 app.setErrorHandler((error, request, reply) => {
   const requestId = request.requestId || 'unknown';
-  
+
   if (error instanceof AppError) {
     const statusCode = error.statusCode || 500;
-    
+
     // Log with context
     request.log.warn({
       requestId,
@@ -74,7 +75,7 @@ app.setErrorHandler((error, request, reply) => {
       path: request.url,
       method: request.method,
     }, 'Request error');
-    
+
     reply.status(statusCode).send({
       error: error.code,
       detail: error.detail || error.message,
@@ -89,7 +90,7 @@ app.setErrorHandler((error, request, reply) => {
       path: request.url,
       method: request.method,
     }, 'Unexpected error');
-    
+
     reply.status(500).send({
       error: 'internal_server_error',
       detail: 'An unexpected error occurred',
@@ -107,7 +108,7 @@ app.get('/health', async () => {
 app.get('/metrics', async (request, reply) => {
   const { Metrics } = await import('./utils/metrics.js');
   const summary = Metrics.getSummary();
-  
+
   return {
     timestamp: new Date().toISOString(),
     metrics: {
@@ -119,6 +120,7 @@ app.get('/metrics', async (request, reply) => {
 
 // Register routes
 app.register(authRoutes);
+app.register(restaurantRoutes);
 app.register(availabilityRoutes);
 app.register(reservationsRoutes);
 
