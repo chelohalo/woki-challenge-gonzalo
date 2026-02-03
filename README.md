@@ -504,7 +504,7 @@ Response:
    npm run db:push
    npm run db:seed   # Required: creates sectors (Main Hall, Terrace, Bar) and tables
    ```
-   Without the seed, the sectors "Terrace" and "Bar" (and their tables) won't exist; the frontend loads sectors from the API, so only sectors present in the DB will appear in the dropdown.
+   Without the seed, the sectors "Terrace" and "Bar" (and their tables) won't exist; the frontend loads sectors from the API, so only sectors present in the DB will appear in the dropdown. If you see **"Test Sector"** in the app, the database was seeded by the test suite; run `npm run db:seed` (with production env) to replace it with **Main Hall**, **Terrace**, and **Bar**.
 
 ### Post-Deployment Checklist
 
