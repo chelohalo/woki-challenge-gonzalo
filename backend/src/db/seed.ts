@@ -1,10 +1,15 @@
 import { db } from './index.js';
 import { restaurants, sectors, tables, reservations, idempotencyKeys } from './schema.js';
 
-const baseDate = '2025-09-08T00:00:00-03:00';
+// Use current time for audit fields so seed stays relevant whenever run
+function nowISO(): string {
+  return new Date().toISOString();
+}
 
 async function seed() {
   console.log('🌱 Seeding database...');
+
+  const baseDate = nowISO();
 
   // Clean up existing data (for idempotent seeding)
   // Delete in order to respect foreign key constraints
@@ -31,29 +36,18 @@ async function seed() {
       { maxPartySize: 999, durationMinutes: 150 }, // >8 guests
     ],
     minAdvanceMinutes: 30, // At least 30 minutes in advance
-    maxAdvanceDays: 30, // Up to 30 days in advance
+    maxAdvanceDays: 90, // Up to 90 days so next months are bookable
     largeGroupThreshold: 8, // Groups of 8+ require approval
     pendingHoldTTLMinutes: 60, // Pending holds expire after 60 minutes
     createdAt: baseDate,
     updatedAt: baseDate,
   });
 
-  // Sectors
+  // Sectors: Main Hall, Terrace, Bar
   await db.insert(sectors).values([
-    {
-      id: 'S1',
-      restaurantId: 'R1',
-      name: 'Main Hall',
-      createdAt: baseDate,
-      updatedAt: baseDate,
-    },
-    {
-      id: 'S2',
-      restaurantId: 'R1',
-      name: 'Terrace',
-      createdAt: baseDate,
-      updatedAt: baseDate,
-    },
+    { id: 'S1', restaurantId: 'R1', name: 'Main Hall', createdAt: baseDate, updatedAt: baseDate },
+    { id: 'S2', restaurantId: 'R1', name: 'Terrace', createdAt: baseDate, updatedAt: baseDate },
+    { id: 'S3', restaurantId: 'R1', name: 'Bar', createdAt: baseDate, updatedAt: baseDate },
   ]);
 
   // Tables - Main Hall (S1): 15 tables with various sizes
@@ -91,6 +85,16 @@ async function seed() {
     { id: 'T27', name: 'Table 27', minSize: 4, maxSize: 5 },
   ];
 
+  // Tables - Bar (S3): 6 tables
+  const barTables = [
+    { id: 'T28', name: 'Bar 1', minSize: 1, maxSize: 2 },
+    { id: 'T29', name: 'Bar 2', minSize: 1, maxSize: 2 },
+    { id: 'T30', name: 'Bar 3', minSize: 2, maxSize: 4 },
+    { id: 'T31', name: 'Bar 4', minSize: 2, maxSize: 4 },
+    { id: 'T32', name: 'Bar 5', minSize: 2, maxSize: 4 },
+    { id: 'T33', name: 'Bar 6', minSize: 4, maxSize: 6 },
+  ];
+
   // Insert Main Hall tables
   await db.insert(tables).values(
     mainHallTables.map((t) => ({
@@ -117,7 +121,73 @@ async function seed() {
     }))
   );
 
+  // Insert Bar tables
+  await db.insert(tables).values(
+    barTables.map((t) => ({
+      id: t.id,
+      sectorId: 'S3',
+      name: t.name,
+      minSize: t.minSize,
+      maxSize: t.maxSize,
+      createdAt: baseDate,
+      updatedAt: baseDate,
+    }))
+  );
+
+  // --- Sample reservations for the next 1–2 months (so the app has data to show) ---
+  const offset = '-03:00'; // America/Argentina/Buenos_Aires
+
+  function dateInDays(daysFromNow: number, timeHHMM: string): string {
+    const d = new Date();
+    d.setDate(d.getDate() + daysFromNow);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}T${timeHHMM}:00${offset}`;
+  }
+
+  function addMinutesISO(iso: string, minutes: number): string {
+    return new Date(new Date(iso).getTime() + minutes * 60 * 1000).toISOString();
+  }
+
+  const sampleReservations = [
+    { start: dateInDays(7, '20:00'), partySize: 2, durationMin: 75, sectorId: 'S1' as const, tableId: 'T1', customerName: 'Ana García', customerPhone: '+54 11 4444-1111', customerEmail: 'ana@example.com' },
+    { start: dateInDays(14, '12:30'), partySize: 4, durationMin: 90, sectorId: 'S1' as const, tableId: 'T4', customerName: 'Carlos López', customerPhone: '+54 11 4444-2222', customerEmail: 'carlos@example.com' },
+    { start: dateInDays(21, '20:00'), partySize: 2, durationMin: 75, sectorId: 'S1' as const, tableId: 'T2', customerName: 'María Fernández', customerPhone: '+54 11 4444-3333', customerEmail: 'maria@example.com' },
+    { start: dateInDays(10, '20:00'), partySize: 2, durationMin: 75, sectorId: 'S2' as const, tableId: 'T16', customerName: 'Juan Pérez', customerPhone: '+54 11 4444-4444', customerEmail: 'juan@example.com' },
+    { start: dateInDays(18, '20:30'), partySize: 4, durationMin: 90, sectorId: 'S2' as const, tableId: 'T19', customerName: 'Laura Martínez', customerPhone: '+54 11 4444-5555', customerEmail: 'laura@example.com' },
+    { start: dateInDays(30, '21:00'), partySize: 2, durationMin: 75, sectorId: 'S2' as const, tableId: 'T17', customerName: 'Pedro Sánchez', customerPhone: '+54 11 4444-6666', customerEmail: 'pedro@example.com' },
+    { start: dateInDays(3, '20:00'), partySize: 2, durationMin: 75, sectorId: 'S3' as const, tableId: 'T28', customerName: 'Sofía Ruiz', customerPhone: '+54 11 4444-7777', customerEmail: 'sofia@example.com' },
+    { start: dateInDays(45, '21:00'), partySize: 2, durationMin: 75, sectorId: 'S3' as const, tableId: 'T29', customerName: 'Diego Torres', customerPhone: '+54 11 4444-8888', customerEmail: 'diego@example.com' },
+  ];
+
+  for (let i = 0; i < sampleReservations.length; i++) {
+    const r = sampleReservations[i];
+    const id = `RES_SEED${String(i + 1).padStart(2, '0')}`;
+    const startISO = r.start;
+    const endISO = addMinutesISO(startISO, r.durationMin);
+    await db.insert(reservations).values({
+      id,
+      restaurantId: 'R1',
+      sectorId: r.sectorId,
+      tableIds: [r.tableId],
+      partySize: r.partySize,
+      startDateTime: startISO,
+      endDateTime: endISO,
+      status: 'CONFIRMED',
+      expiresAt: null,
+      customerName: r.customerName,
+      customerPhone: r.customerPhone,
+      customerEmail: r.customerEmail,
+      notes: null,
+      createdAt: baseDate,
+      updatedAt: baseDate,
+    });
+  }
+
   console.log('✅ Seed completed successfully!');
+  console.log(`   Restaurant R1, sectors: Main Hall (S1), Terrace (S2), Bar (S3).`);
+  console.log(`   ${mainHallTables.length + terraceTables.length + barTables.length} tables, ${sampleReservations.length} sample reservations for the next months.`);
 }
 
 seed()
