@@ -74,7 +74,9 @@ export async function getAvailability(
   // 8. Process slots in memory (no additional DB queries)
   const availability: AvailabilitySlot[] = [];
 
+  const now = Date.now();
   for (const slotStart of slots) {
+    if (slotStart.getTime() < now) continue;
     const slotStartISO = formatISODateTime(slotStart);
     // Use party-size-specific duration for overlap checking
     const slotEnd = addMinutesToDate(slotStart, reservationDurationMinutes);

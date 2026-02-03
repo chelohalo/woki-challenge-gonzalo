@@ -56,40 +56,40 @@ export function EditReservationForm({
       }
       const idempotencyKey = idempotencyKeyRef.current;
 
+      const customerChanged =
+        formData.name !== reservation.customer.name ||
+        formData.phone !== reservation.customer.phone ||
+        formData.email !== reservation.customer.email;
+
+      const updatePayload: Parameters<typeof reservationsApi.update>[1] = {
+        sectorId:
+          formData.sectorId !== reservation.sectorId
+            ? formData.sectorId
+            : undefined,
+        partySize:
+          formData.partySize !== reservation.partySize
+            ? formData.partySize
+            : undefined,
+        startDateTimeISO:
+          formData.startDateTimeISO !== reservation.start
+            ? formData.startDateTimeISO
+            : undefined,
+        notes:
+          formData.notes !== (reservation.notes || "")
+            ? formData.notes
+            : undefined,
+      };
+      if (customerChanged) {
+        updatePayload.customer = {
+          name: formData.name,
+          phone: formData.phone,
+          email: formData.email,
+        };
+      }
+
       await reservationsApi.update(
         reservation.id,
-        {
-          sectorId:
-            formData.sectorId !== reservation.sectorId
-              ? formData.sectorId
-              : undefined,
-          partySize:
-            formData.partySize !== reservation.partySize
-              ? formData.partySize
-              : undefined,
-          startDateTimeISO:
-            formData.startDateTimeISO !== reservation.start
-              ? formData.startDateTimeISO
-              : undefined,
-          customer: {
-            name:
-              formData.name !== reservation.customer.name
-                ? formData.name
-                : undefined,
-            phone:
-              formData.phone !== reservation.customer.phone
-                ? formData.phone
-                : undefined,
-            email:
-              formData.email !== reservation.customer.email
-                ? formData.email
-                : undefined,
-          },
-          notes:
-            formData.notes !== (reservation.notes || "")
-              ? formData.notes
-              : undefined,
-        },
+        updatePayload,
         idempotencyKey
       );
 
