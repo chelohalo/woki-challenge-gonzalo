@@ -24,8 +24,8 @@ export async function getReservationsByDay(
   
   // Get calendar day bounds in UTC (representing local day in restaurant timezone)
   const dayStartUTC = getZonedDayStartUTC(date, tz);
-  const dayEndUTC = new Date(dayStartUTC);
-  dayEndUTC.setUTCHours(23, 59, 59, 999);
+  // End of same calendar day in restaurant TZ = start of next day minus 1ms
+  const dayEndUTC = new Date(dayStartUTC.getTime() + 24 * 60 * 60 * 1000 - 1);
 
   // Get all confirmed and pending reservations (pending holds also block availability)
   // Filter by timestamp in memory to avoid timezone issues with string comparison
